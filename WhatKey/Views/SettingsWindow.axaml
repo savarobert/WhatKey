@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WhatKey.ViewModels"
+        x:Class="WhatKey.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="WhatKey Settings"
+        Width="420"
+        Height="250"
+        MinWidth="380"
+        MinHeight="220"
+        WindowStartupLocation="CenterScreen">
+    <StackPanel Margin="24" Spacing="18">
+        <TextBlock FontSize="22" FontWeight="SemiBold" Text="WhatKey Settings" />
+
+        <Grid ColumnDefinitions="*,220" RowDefinitions="Auto,Auto" RowSpacing="14">
+            <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Overlay position" />
+            <ComboBox Grid.Row="0" Grid.Column="1"
+                      ItemsSource="{Binding Positions}"
+                      SelectedItem="{Binding SelectedPosition}"
+                      DisplayMemberBinding="{Binding DisplayName}" />
+
+            <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Overlay size" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <Slider Width="170" Minimum="0.75" Maximum="2" SmallChange="0.05" LargeChange="0.25"
+                        Value="{Binding Scale, Mode=TwoWay}" />
+                <TextBlock Width="42" VerticalAlignment="Center" Text="{Binding ScaleText}" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Opacity="0.65" Text="Changes are saved automatically." />
+    </StackPanel>
+</Window>
