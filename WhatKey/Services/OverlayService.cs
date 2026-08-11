@@ -61,11 +61,18 @@ public sealed class OverlayService : IOverlayService
         var cancellationToken = _dismissCancellation.Token;
 
         _viewModel.Show(key, isOn);
-        PositionWindow();
         if (!_window.IsVisible)
+        {
+            _window.Opacity = 0;
             _window.Show();
+            PositionWindow();
+            _window.Opacity = 1;
+        }
         else
+        {
+            PositionWindow();
             _window.Topmost = true;
+        }
 
         try
         {
@@ -83,7 +90,7 @@ public sealed class OverlayService : IOverlayService
     {
         var width = (int)Math.Ceiling(_window.Width);
         var height = (int)Math.Ceiling(_window.Height);
-        var workArea = _positioningService.GetActiveWorkArea();
+        var workArea = _positioningService.GetActiveWorkArea(_window);
         var position = _positioningService.CalculatePosition(workArea, width, height, _settings.OverlayPosition);
         _window.Position = new PixelPoint(position.X, position.Y);
     }

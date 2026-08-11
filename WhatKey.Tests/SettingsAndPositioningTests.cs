@@ -7,6 +7,19 @@ namespace WhatKey.Tests;
 public sealed class SettingsAndPositioningTests
 {
     [Fact]
+    public void MonitorFactorySelectsTheCurrentOperatingSystemImplementation()
+    {
+        using var monitor = LockKeyMonitorFactory.Create();
+
+        if (OperatingSystem.IsWindows())
+            Assert.IsType<WindowsLockKeyMonitor>(monitor);
+        else if (OperatingSystem.IsLinux())
+            Assert.IsType<LinuxLockKeyMonitor>(monitor);
+        else
+            Assert.IsType<UnsupportedLockKeyMonitor>(monitor);
+    }
+
+    [Fact]
     public void SettingsRoundTripPreservesUserPreferences()
     {
         var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");

@@ -5,20 +5,18 @@
         x:DataType="vm:OverlayViewModel"
         Width="300"
         Height="82"
-        SystemDecorations="None"
+        WindowDecorations="None"
         ShowInTaskbar="False"
         ShowActivated="False"
         CanResize="False"
         Topmost="True"
-        Background="Transparent"
-        TransparencyLevelHint="Acrylic"
         WindowStartupLocation="Manual">
     <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
             BorderThickness="1"
             CornerRadius="12"
             Padding="22,12">
-        <StackPanel Orientation="Horizontal" Spacing="12" VerticalContentAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="12">
             <Border Width="36" Height="36" CornerRadius="18"
                     Background="{DynamicResource SystemAccentColorBrush}">
                 <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"

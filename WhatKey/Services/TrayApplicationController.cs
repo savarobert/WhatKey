@@ -1,9 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Media.Imaging;
 using Avalonia.Platform;
-using ReactiveUI;
 using WhatKey.Models;
 using WhatKey.ViewModels;
 using WhatKey.Views;
@@ -28,7 +26,7 @@ public sealed class TrayApplicationController : IDisposable
         _desktop = desktop;
         _settingsService = new JsonSettingsService();
         _settings = _settingsService.Load();
-        _lockKeyMonitor = new WindowsLockKeyMonitor();
+        _lockKeyMonitor = LockKeyMonitorFactory.Create();
         _overlayService = new OverlayService(new ScreenPositioningService());
         _enabledMenuItem = new NativeMenuItem("Enabled")
         {
