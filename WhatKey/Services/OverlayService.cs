@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Microsoft.Extensions.Logging;
 using WhatKey.Models;
 using WhatKey.ViewModels;
 using WhatKey.Views;
@@ -12,14 +13,16 @@ public sealed class OverlayService : IOverlayService
     private const double BaseWidth = 300;
     private const double BaseHeight = 82;
     private readonly OverlayWindow _window;
+    private readonly ILogger<OverlayService> _logger;
     private readonly OverlayViewModel _viewModel;
     private readonly ScreenPositioningService _positioningService;
     private CancellationTokenSource? _dismissCancellation;
     private AppSettings _settings = new();
 
-    public OverlayService(ScreenPositioningService positioningService)
+    public OverlayService(ScreenPositioningService positioningService, ILogger<OverlayService>? logger = null)
     {
         _positioningService = positioningService;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OverlayService>.Instance;
         _viewModel = new OverlayViewModel();
         _window = new OverlayWindow { DataContext = _viewModel };
     }
@@ -83,6 +86,10 @@ public sealed class OverlayService : IOverlayService
         catch (OperationCanceledException)
         {
             // A newer key event restarted the overlay timeout.
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "Failed to display lock-key overlay");
         }
     }
 

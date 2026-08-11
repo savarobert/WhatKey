@@ -1,6 +1,7 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using WhatKey.Models;
 
 namespace WhatKey.Services;
@@ -20,9 +21,15 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
     private const int EventSize32 = 16;
 
     private readonly Dictionary<LockKey, bool> _states = new();
+    private readonly ILogger _logger;
     private FileStream? _stream;
     private Thread? _readerThread;
     private volatile bool _stopping;
+
+    internal LinuxEvdevLockKeyBackend(ILogger? logger = null)
+    {
+        _logger = logger ?? NullLogger.Instance;
+    }
 
     public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
 
@@ -48,6 +55,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
                     }
 
                     _stream = stream;
+                    _logger.LogInformation("Opened Linux input device {DevicePath}", path);
                     LoadInitialLedState(stream.SafeFileHandle);
                     _stopping = false;
                     _readerThread = new Thread(ReadLoop)
@@ -61,7 +69,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
                 catch (UnauthorizedAccessException)
                 {
                     stream?.Dispose();
-                    Trace.WriteLine($"WhatKey: permission denied reading {path}. Add the user to the input group for Linux global monitoring.");
+                    _logger.LogWarning("Permission denied reading Linux input device {DevicePath}; add the user to the input group for global monitoring", path);
                 }
                 catch (IOException)
                 {
@@ -71,13 +79,14 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
         }
         catch (DirectoryNotFoundException)
         {
-            Trace.WriteLine("WhatKey: /dev/input is unavailable; Linux global monitoring is disabled.");
+            _logger.LogWarning("/dev/input is unavailable; Linux global monitoring is disabled");
         }
         catch (UnauthorizedAccessException)
         {
-            Trace.WriteLine("WhatKey: permission denied enumerating /dev/input; Linux global monitoring is disabled.");
+            _logger.LogWarning("Permission denied enumerating /dev/input; Linux global monitoring is disabled");
         }
 
+        _logger.LogWarning("No Linux input device exposing Caps Lock, Num Lock, or Scroll Lock was found");
         return false;
     }
 
@@ -121,11 +130,11 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
         }
         catch (IOException exception) when (_stopping)
         {
-            Trace.WriteLine($"WhatKey: Linux input monitor stopped: {exception.Message}");
+            _logger.LogDebug(exception, "Linux input monitor stopped");
         }
         catch (Exception exception)
         {
-            Trace.WriteLine($"WhatKey: Linux input monitor failed: {exception.Message}");
+            _logger.LogError(exception, "Linux input monitor failed");
         }
     }
 
@@ -156,6 +165,8 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
             _states[LockKey.NumLock] = (leds[0] & (1 << LedNumLock)) != 0;
             _states[LockKey.CapsLock] = (leds[0] & (1 << LedCapsLock)) != 0;
             _states[LockKey.ScrollLock] = (leds[0] & (1 << LedScrollLock)) != 0;
+            _logger.LogDebug("Loaded Linux lock-key LED state: CapsLock={CapsLock}, NumLock={NumLock}, ScrollLock={ScrollLock}",
+                _states[LockKey.CapsLock], _states[LockKey.NumLock], _states[LockKey.ScrollLock]);
         }
     }
 
@@ -203,4 +214,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
 
 internal sealed class WaylandEvdevLockKeyBackend : LinuxEvdevLockKeyBackend
 {
+    public WaylandEvdevLockKeyBackend(ILogger? logger = null) : base(logger)
+    {
+    }
 }

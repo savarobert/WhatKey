@@ -1,4 +1,5 @@
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using WhatKey.Models;
 
 namespace WhatKey.Services;
@@ -6,7 +7,14 @@ namespace WhatKey.Services;
 public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
 {
     private ILockKeyBackend? _backend;
+    private readonly ILogger<LinuxLockKeyMonitor> _logger;
     private bool _started;
+
+    public LinuxLockKeyMonitor(ILoggerFactory? loggerFactory = null)
+    {
+        _logger = loggerFactory?.CreateLogger<LinuxLockKeyMonitor>() ?? NullLogger<LinuxLockKeyMonitor>.Instance;
+        _logger.LogInformation("Linux lock-key monitor initializing");
+    }
 
     public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
 
@@ -16,7 +24,7 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
             return;
 
         _started = true;
-        foreach (var candidate in LinuxLockKeyBackendFactory.CreateCandidates())
+        foreach (var candidate in LinuxLockKeyBackendFactory.CreateCandidates(_logger))
         {
             try
             {
@@ -24,7 +32,7 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
                 if (candidate.TryStart())
                 {
                     _backend = candidate;
-                    Trace.WriteLine($"WhatKey: using Linux lock-key backend {candidate.GetType().Name}.");
+                    _logger.LogInformation("Using Linux lock-key backend {Backend}", candidate.GetType().Name);
                     return;
                 }
 
@@ -33,19 +41,19 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
             }
             catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException or IOException)
             {
-                Trace.WriteLine($"WhatKey: Linux lock-key backend {candidate.GetType().Name} is unavailable: {exception.Message}");
+                _logger.LogWarning(exception, "Linux lock-key backend {Backend} is unavailable", candidate.GetType().Name);
                 candidate.StateChanged -= OnBackendStateChanged;
                 candidate.Dispose();
             }
             catch (Exception exception)
             {
-                Trace.WriteLine($"WhatKey: Linux lock-key backend {candidate.GetType().Name} failed: {exception.Message}");
+                _logger.LogError(exception, "Linux lock-key backend {Backend} failed", candidate.GetType().Name);
                 candidate.StateChanged -= OnBackendStateChanged;
                 candidate.Dispose();
             }
         }
 
-        Trace.WriteLine("WhatKey: no usable Linux global lock-key backend was found. Monitoring is disabled.");
+        _logger.LogWarning("No usable Linux global lock-key backend was found; monitoring is disabled");
     }
 
     public void Dispose()
@@ -57,6 +65,7 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
             _backend = null;
         }
 
+        _logger.LogInformation("Linux lock-key monitor disposed");
         _started = false;
         GC.SuppressFinalize(this);
     }
@@ -66,9 +75,10 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
 
 internal static class LinuxLockKeyBackendFactory
 {
-    public static IEnumerable<ILockKeyBackend> CreateCandidates()
+    public static IEnumerable<ILockKeyBackend> CreateCandidates(ILogger logger)
     {
         var sessionType = Environment.GetEnvironmentVariable("XDG_SESSION_TYPE")?.Trim().ToLowerInvariant();
+        logger.LogInformation("Detected Linux session type {SessionType}", sessionType ?? "unknown");
         var isWayland = sessionType == "wayland" ||
                         (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")) && sessionType != "x11");
         var isX11 = sessionType == "x11" ||
@@ -76,18 +86,22 @@ internal static class LinuxLockKeyBackendFactory
 
         if (isX11)
         {
-            yield return new X11LockKeyBackend();
-            yield return new LinuxEvdevLockKeyBackend();
+            logger.LogDebug("Probing X11 XInput2 lock-key backend");
+            yield return new X11LockKeyBackend(logger);
+            logger.LogDebug("Probing Linux evdev lock-key fallback");
+            yield return new LinuxEvdevLockKeyBackend(logger);
             yield break;
         }
 
         if (isWayland)
         {
-            yield return new WaylandEvdevLockKeyBackend();
+            logger.LogInformation("Detected Wayland; using evdev-compatible global input backend");
+            yield return new WaylandEvdevLockKeyBackend(logger);
             yield break;
         }
 
         // Headless sessions and unusual compositors can still use evdev when permissions allow it.
-        yield return new LinuxEvdevLockKeyBackend();
+        logger.LogDebug("Probing Linux evdev lock-key backend for an unknown session");
+        yield return new LinuxEvdevLockKeyBackend(logger);
     }
 }

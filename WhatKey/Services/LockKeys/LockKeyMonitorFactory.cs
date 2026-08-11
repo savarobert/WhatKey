@@ -1,18 +1,27 @@
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace WhatKey.Services;
 
 public static class LockKeyMonitorFactory
 {
-    public static ILockKeyMonitor Create()
+    public static ILockKeyMonitor Create(ILoggerFactory? loggerFactory = null)
     {
+        var logger = loggerFactory?.CreateLogger("WhatKey.LockKeyMonitorFactory") ?? NullLogger.Instance;
+
         if (OperatingSystem.IsWindows())
-            return new WindowsLockKeyMonitor();
+        {
+            logger.LogInformation("Selected lock-key backend {Backend}", nameof(WindowsLockKeyMonitor));
+            return new WindowsLockKeyMonitor(loggerFactory?.CreateLogger<WindowsLockKeyMonitor>());
+        }
 
         if (OperatingSystem.IsLinux())
-            return new LinuxLockKeyMonitor();
+        {
+            logger.LogInformation("Selected lock-key backend {Backend}", nameof(LinuxLockKeyMonitor));
+            return new LinuxLockKeyMonitor(loggerFactory);
+        }
 
-        Trace.WriteLine("WhatKey: global lock-key monitoring is unavailable on this operating system.");
+        logger.LogWarning("Global lock-key monitoring is unavailable on this operating system");
         return new UnsupportedLockKeyMonitor();
     }
 }

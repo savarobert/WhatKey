@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using WhatKey.Models;
 
 namespace WhatKey.Services;
@@ -17,10 +18,16 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
 
     private readonly Dictionary<LockKey, bool> _states = new();
     private readonly HashSet<LockKey> _pressedKeys = new();
+    private readonly ILogger _logger;
     private nint _display;
     private int _extensionOpcode;
     private Thread? _eventThread;
     private volatile bool _stopping;
+
+    public X11LockKeyBackend(ILogger? logger = null)
+    {
+        _logger = logger ?? NullLogger.Instance;
+    }
 
     public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
 
@@ -72,15 +79,16 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
                 Name = "WhatKey X11 input monitor",
             };
             _eventThread.Start();
+            _logger.LogInformation("X11 XInput2 lock-key backend initialized");
             return true;
         }
         catch (DllNotFoundException exception)
         {
-            Trace.WriteLine($"WhatKey: X11 libraries are unavailable: {exception.Message}");
+            _logger.LogWarning(exception, "X11 libraries are unavailable");
         }
         catch (EntryPointNotFoundException exception)
         {
-            Trace.WriteLine($"WhatKey: X11 input entry point is unavailable: {exception.Message}");
+            _logger.LogWarning(exception, "X11 input entry point is unavailable");
         }
 
         Dispose();
@@ -99,11 +107,13 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
             XCloseDisplay(_display);
             _display = 0;
         }
+
+        _logger.LogInformation("X11 lock-key backend disposed");
     }
 
     private bool Fail(string message)
     {
-        Trace.WriteLine($"WhatKey: {message}.");
+        _logger.LogWarning("X11 lock-key backend unavailable: {Reason}", message);
         Dispose();
         return false;
     }
@@ -169,7 +179,7 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
         }
         catch (Exception exception) when (!_stopping)
         {
-            Trace.WriteLine($"WhatKey: X11 input monitor failed: {exception.Message}");
+            _logger.LogError(exception, "X11 input monitor failed");
         }
     }
 

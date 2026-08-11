@@ -1,23 +1,52 @@
-﻿using Avalonia;
+using Avalonia;
+using Microsoft.Extensions.Logging;
 using ReactiveUI.Avalonia;
-using System;
+using WhatKey.Services;
 
 namespace WhatKey;
 
 sealed class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
-    [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    internal static ILoggerFactory? LoggerFactory { get; private set; }
 
-    // Avalonia configuration, don't remove; also used by visual designer.
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        using var logging = LoggingBootstrapper.Create();
+        LoggerFactory = logging.LoggerFactory;
+        LoggingBootstrapper.ConfigureAvaloniaLogging(logging.LoggerFactory);
+
+        var logger = logging.LoggerFactory.CreateLogger<Program>();
+        AppDomain.CurrentDomain.UnhandledException += (_, eventArgs) =>
+            logger.LogCritical(eventArgs.ExceptionObject as Exception, "Unhandled application exception");
+        TaskScheduler.UnobservedTaskException += (_, eventArgs) =>
+            logger.LogError(eventArgs.Exception, "Unobserved task exception");
+
+        logger.LogInformation(
+            "Application starting. Version: {Version}; Platform: {Platform}; LogDirectory: {LogDirectory}",
+            typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
+            Environment.OSVersion.Platform,
+            logging.LogDirectory);
+
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception exception)
+        {
+            logger.LogCritical(exception, "Application terminated unexpectedly");
+            throw;
+        }
+        finally
+        {
+            logger.LogInformation("Application shutting down");
+            LoggerFactory = null;
+        }
+    }
+
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
-            .LogToTrace()
             .UseReactiveUI(_ => { });
 }

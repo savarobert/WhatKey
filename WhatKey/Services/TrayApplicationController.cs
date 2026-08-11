@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
+using Microsoft.Extensions.Logging;
 using WhatKey.Models;
 using WhatKey.ViewModels;
 using WhatKey.Views;
@@ -11,6 +12,7 @@ namespace WhatKey.Services;
 public sealed class TrayApplicationController : IDisposable
 {
     private readonly IClassicDesktopStyleApplicationLifetime _desktop;
+    private readonly ILogger<TrayApplicationController> _logger;
     private readonly ISettingsService _settingsService;
     private readonly ILockKeyMonitor _lockKeyMonitor;
     private readonly IOverlayService _overlayService;
@@ -21,13 +23,14 @@ public sealed class TrayApplicationController : IDisposable
     private SettingsViewModel? _settingsViewModel;
     private bool _isDisposed;
 
-    public TrayApplicationController(IClassicDesktopStyleApplicationLifetime desktop)
+    public TrayApplicationController(IClassicDesktopStyleApplicationLifetime desktop, ILoggerFactory loggerFactory)
     {
         _desktop = desktop;
-        _settingsService = new JsonSettingsService();
+        _logger = loggerFactory.CreateLogger<TrayApplicationController>();
+        _settingsService = new JsonSettingsService(logger: loggerFactory.CreateLogger<JsonSettingsService>());
         _settings = _settingsService.Load();
-        _lockKeyMonitor = LockKeyMonitorFactory.Create();
-        _overlayService = new OverlayService(new ScreenPositioningService());
+        _lockKeyMonitor = LockKeyMonitorFactory.Create(loggerFactory);
+        _overlayService = new OverlayService(new ScreenPositioningService(), loggerFactory.CreateLogger<OverlayService>());
         _enabledMenuItem = new NativeMenuItem("Enabled")
         {
             ToggleType = MenuItemToggleType.CheckBox,
@@ -37,6 +40,7 @@ public sealed class TrayApplicationController : IDisposable
 
     public void Start()
     {
+        _logger.LogInformation("Starting tray application lifetime");
         _desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _desktop.Exit += OnDesktopExit;
         _enabledMenuItem.Click += OnEnabledClicked;
@@ -75,6 +79,7 @@ public sealed class TrayApplicationController : IDisposable
         _settingsWindow?.Close();
         _trayIcon?.Dispose();
         _desktop.Exit -= OnDesktopExit;
+        _logger.LogInformation("Tray application lifetime stopped");
     }
 
     private void OnDesktopExit(object? sender, ControlledApplicationLifetimeExitEventArgs e) => Dispose();
@@ -85,6 +90,7 @@ public sealed class TrayApplicationController : IDisposable
         _enabledMenuItem.IsChecked = _settings.Enabled;
         _settingsService.Save(_settings);
         _overlayService.ApplySettings(_settings);
+        _logger.LogInformation("Lock-key overlays {State}", _settings.Enabled ? "enabled" : "disabled");
     }
 
     private void OnLockKeyStateChanged(object? sender, LockKeyChangedEventArgs e)
