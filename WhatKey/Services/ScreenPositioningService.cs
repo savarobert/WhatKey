@@ -5,9 +5,9 @@ using WhatKey.Models;
 
 namespace WhatKey.Services;
 
-public sealed class ScreenPositioningService
+public static class ScreenPositioningService
 {
-    public ScreenArea GetActiveWorkArea(Window window)
+    public static ScreenArea GetActiveWorkArea(Window window)
     {
         var screens = window.Screens;
         var screen = screens.ScreenFromWindow(window) ?? screens.Primary ?? screens.All.FirstOrDefault();
@@ -15,6 +15,6 @@ public sealed class ScreenPositioningService
         return new ScreenArea(workingArea.X, workingArea.Y, workingArea.Width, workingArea.Height);
     }
 
-    public OverlayCoordinates CalculatePosition(ScreenArea workArea, int width, int height,
+    public static OverlayCoordinates CalculatePosition(ScreenArea workArea, int width, int height,
         OverlayPosition position) => OverlayPositionCalculator.Calculate(workArea, width, height, position);
 }

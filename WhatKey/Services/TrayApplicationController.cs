@@ -30,7 +30,7 @@ public sealed class TrayApplicationController : IDisposable
         _settingsService = new JsonSettingsService(logger: loggerFactory.CreateLogger<JsonSettingsService>());
         _settings = _settingsService.Load();
         _lockKeyMonitor = LockKeyMonitorFactory.Create(loggerFactory);
-        _overlayService = new OverlayService(new ScreenPositioningService(), loggerFactory.CreateLogger<OverlayService>());
+        _overlayService = new OverlayService(loggerFactory.CreateLogger<OverlayService>());
         _enabledMenuItem = new NativeMenuItem("Enabled")
         {
             ToggleType = MenuItemToggleType.CheckBox,

@@ -15,13 +15,11 @@ public sealed class OverlayService : IOverlayService
     private readonly OverlayWindow _window;
     private readonly ILogger<OverlayService> _logger;
     private readonly OverlayViewModel _viewModel;
-    private readonly ScreenPositioningService _positioningService;
     private CancellationTokenSource? _dismissCancellation;
     private AppSettings _settings = new();
 
-    public OverlayService(ScreenPositioningService positioningService, ILogger<OverlayService>? logger = null)
+    public OverlayService(ILogger<OverlayService>? logger = null)
     {
-        _positioningService = positioningService;
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OverlayService>.Instance;
         _viewModel = new OverlayViewModel();
         _window = new OverlayWindow { DataContext = _viewModel };
@@ -97,8 +95,8 @@ public sealed class OverlayService : IOverlayService
     {
         var width = (int)Math.Ceiling(_window.Width);
         var height = (int)Math.Ceiling(_window.Height);
-        var workArea = _positioningService.GetActiveWorkArea(_window);
-        var position = _positioningService.CalculatePosition(workArea, width, height, _settings.OverlayPosition);
+        var workArea = ScreenPositioningService.GetActiveWorkArea(_window);
+        var position = ScreenPositioningService.CalculatePosition(workArea, width, height, _settings.OverlayPosition);
         _window.Position = new PixelPoint(position.X, position.Y);
     }
 }

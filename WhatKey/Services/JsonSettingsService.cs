@@ -6,7 +6,6 @@ namespace WhatKey.Services;
 
 public sealed class JsonSettingsService : ISettingsService
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
     private readonly string _filePath;
     private readonly ILogger<JsonSettingsService>? _logger;
 
@@ -26,7 +25,9 @@ public sealed class JsonSettingsService : ISettingsService
                 return new AppSettings();
             }
 
-            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath), SerializerOptions);
+            var settings = JsonSerializer.Deserialize(
+                File.ReadAllText(_filePath),
+                AppSettingsJsonContext.Default.AppSettings);
             var normalized = Normalize(settings ?? new AppSettings());
             _logger?.LogInformation("Settings loaded from {SettingsPath}", _filePath);
             return normalized;
@@ -51,7 +52,9 @@ public sealed class JsonSettingsService : ISettingsService
             if (!string.IsNullOrWhiteSpace(directory))
                 Directory.CreateDirectory(directory);
 
-            File.WriteAllText(_filePath, JsonSerializer.Serialize(Normalize(settings), SerializerOptions));
+            File.WriteAllText(
+                _filePath,
+                JsonSerializer.Serialize(Normalize(settings), AppSettingsJsonContext.Default.AppSettings));
             _logger?.LogDebug("Settings saved to {SettingsPath}", _filePath);
         }
         catch (Exception exception)

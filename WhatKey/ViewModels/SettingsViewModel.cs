@@ -1,5 +1,5 @@
-using System.Reactive;
 using ReactiveUI;
+using ReactiveUI.Primitives;
 using WhatKey.Models;
 using WhatKey.Services;
 
@@ -65,7 +65,7 @@ public sealed class SettingsViewModel : ViewModelBase
     }
 
     public string ScaleText => $"{Scale:P0}";
-    public ReactiveCommand<Unit, Unit> CloseCommand { get; }
+    public ReactiveCommand<RxVoid, RxVoid> CloseCommand { get; }
 
     public void Save()
     {
