@@ -19,8 +19,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
-  SOLUTION: src/WhatKey/WhatKey.slnx
-  APP_PROJECT: src/WhatKey/WhatKey.csproj
+  SOLUTION: WhatKey/WhatKey.slnx
+  APP_PROJECT: WhatKey/WhatKey.csproj
   APP_NAME: WhatKey
   DOTNET_SDK: 10.0.301
 
@@ -47,7 +47,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/global.json', 'src/WhatKey/**/*.csproj', 'src/WhatKey.Tests/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', 'WhatKey/**/*.csproj', 'WhatKey.Tests/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
@@ -88,7 +88,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/global.json', 'src/WhatKey/**/*.csproj', 'src/WhatKey.Tests/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', 'WhatKey/**/*.csproj', 'WhatKey.Tests/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
@@ -126,7 +126,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/global.json', 'src/WhatKey/**/*.csproj', 'src/WhatKey.Tests/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', 'WhatKey/**/*.csproj', 'WhatKey.Tests/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
@@ -177,7 +177,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('src/global.json', 'src/WhatKey/**/*.csproj', 'src/WhatKey.Tests/**/*.csproj') }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', 'WhatKey/**/*.csproj', 'WhatKey.Tests/**/*.csproj') }}
           restore-keys: |
             ${{ runner.os }}-nuget-
 
