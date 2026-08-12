@@ -15,6 +15,7 @@ public sealed class OverlayService : IOverlayService
     private readonly OverlayWindow _window;
     private readonly ILogger<OverlayService> _logger;
     private readonly OverlayViewModel _viewModel;
+    private readonly IWindowTopmostService _windowTopmostService;
     private CancellationTokenSource? _dismissCancellation;
     private AppSettings _settings = new();
 
@@ -23,6 +24,7 @@ public sealed class OverlayService : IOverlayService
         _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<OverlayService>.Instance;
         _viewModel = new OverlayViewModel();
         _window = new OverlayWindow { DataContext = _viewModel };
+        _windowTopmostService = WindowTopmostServiceFactory.Create(_logger);
     }
 
     public void ApplySettings(AppSettings settings)
@@ -62,17 +64,21 @@ public sealed class OverlayService : IOverlayService
         var cancellationToken = _dismissCancellation.Token;
 
         _viewModel.Show(key, isOn);
+        _logger.LogDebug("Showing lock-key overlay for {Key}; enabled state: {IsOn}", key, isOn);
         if (!_window.IsVisible)
         {
             _window.Opacity = 0;
+            _window.Topmost = true;
             _window.Show();
             PositionWindow();
+            _windowTopmostService.EnsureTopmost(_window);
             _window.Opacity = 1;
         }
         else
         {
             PositionWindow();
             _window.Topmost = true;
+            _windowTopmostService.EnsureTopmost(_window);
         }
 
         try
