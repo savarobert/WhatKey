@@ -101,7 +101,8 @@ jobs:
           $publishDir = Join-Path $env:GITHUB_WORKSPACE "artifacts/aot-$env:RID"
           New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
           dotnet publish "$env:APP_PROJECT" --configuration Release --runtime "$env:RID" --no-restore --output $publishDir
-          if (-not (Test-Path (Join-Path $publishDir $env:APP_NAME))) {
+          $executableName = if ($env:RID -eq 'win-x64') { "$env:APP_NAME.exe" } else { $env:APP_NAME }
+          if (-not (Test-Path (Join-Path $publishDir $executableName))) {
             throw "Native AOT executable was not produced for $env:RID"
           }
         shell: pwsh
