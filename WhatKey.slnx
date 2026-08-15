@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="WhatKey\WhatKey.csproj" />
+  <Project Path="WhatKey.Tests\WhatKey.Tests.csproj" />
+</Solution>
