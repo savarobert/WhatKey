@@ -25,7 +25,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
-  SOLUTION: WhatKey/WhatKey.slnx
+  SOLUTION: WhatKey.slnx
   APP_PROJECT: WhatKey/WhatKey.csproj
   APP_NAME: WhatKey
   DOTNET_SDK: 10.0.301
