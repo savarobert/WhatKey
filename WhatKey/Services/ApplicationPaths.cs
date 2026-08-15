@@ -4,11 +4,14 @@ public static class ApplicationPaths
 {
     public const string ApplicationName = "WhatKey";
 
-    public static string DataDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        ApplicationName);
+    public static string BaseDirectory => AppContext.BaseDirectory;
 
-    public static string SettingsFilePath => Path.Combine(DataDirectory, "settings.json");
-    public static string LogDirectory => Path.Combine(DataDirectory, "logs");
-    public static string LogFilePath => Path.Combine(LogDirectory, "whatkey-.log");
+    public static string AppSettingsPath => Path.Combine(BaseDirectory, "appsettings.json");
+    public static string UserSettingsPath => Path.Combine(BaseDirectory, "settings.json");
+    public static string LogsDirectory => Path.Combine(BaseDirectory, "logs");
+    public static string LogFilePath => Path.Combine(LogsDirectory, "whatkey-.log");
+
+    // Keep the existing names available to callers while the path concepts are clarified.
+    public static string SettingsFilePath => UserSettingsPath;
+    public static string LogDirectory => LogsDirectory;
 }

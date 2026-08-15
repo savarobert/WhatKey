@@ -6,7 +6,7 @@ using WhatKey.Models;
 
 namespace WhatKey.Services;
 
-public sealed class WindowsLockKeyMonitor : ILockKeyMonitor
+public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
 {
     private const int WhKeyboardLl = 13;
     private const int WmKeyUp = 0x0101;
@@ -117,19 +117,19 @@ public sealed class WindowsLockKeyMonitor : ILockKeyMonitor
         public nint DwExtraInfo;
     }
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint moduleHandle, uint threadId);
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private  static partial nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint moduleHandle, uint threadId);
 
-    [DllImport("user32.dll", SetLastError = true)]
+    [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool UnhookWindowsHookEx(nint hookHandle);
+    private static partial bool UnhookWindowsHookEx(nint hookHandle);
 
-    [DllImport("user32.dll")]
-    private static extern nint CallNextHookEx(nint hookHandle, int code, nint wParam, nint lParam);
+    [LibraryImport("user32.dll")]
+    private static partial nint CallNextHookEx(nint hookHandle, int code, nint wParam, nint lParam);
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern nint GetModuleHandle(string? moduleName);
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    private static partial nint GetModuleHandle(string? moduleName);
 
-    [DllImport("user32.dll")]
-    private static extern short GetKeyState(uint keyCode);
+    [LibraryImport("user32.dll")]
+    private static partial short GetKeyState(uint keyCode);
 }

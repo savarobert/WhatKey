@@ -21,9 +21,16 @@ If the display server, native libraries, or input-device permissions do not allo
 
 ## Logging
 
-WhatKey uses Serilog through the standard `Microsoft.Extensions.Logging` abstractions. Logs are written to daily rolling files with a 14-file retention limit and a 10 MB size limit per file.
+WhatKey uses Serilog through the standard `Microsoft.Extensions.Logging` abstractions. The portable runtime layout beside the executable is:
 
-- Windows: `%LOCALAPPDATA%/WhatKey/logs/`
-- Linux: `~/.local/share/WhatKey/logs/`
+```text
+WhatKey/
+├── WhatKey.exe / WhatKey
+├── appsettings.json
+├── settings.json
+└── logs/
+```
+
+Logs are written to daily rolling files with the retention and size limits from `appsettings.json`. The application directory must be writable for settings persistence and local file logging.
 
 Logs include timestamps, levels, source context, structured diagnostic values, and exception details. They can be included when submitting bug reports.

@@ -34,9 +34,11 @@ public static class LoggingBootstrapper
 {
     public static LoggingContext Create()
     {
-        var logDirectory = ApplicationPaths.LogDirectory;
+        var configurationResult = ApplicationConfigurationLoader.Load();
+        var loggingOptions = configurationResult.Configuration.Logging;
+        var logDirectory = ApplicationPaths.LogsDirectory;
         var configuration = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(loggingOptions.MinimumLevel)
             .MinimumLevel.Override("Avalonia", SerilogLogEventLevel.Warning)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", ApplicationPaths.ApplicationName);
@@ -47,8 +49,8 @@ public static class LoggingBootstrapper
             configuration = configuration.WriteTo.File(
                 ApplicationPaths.LogFilePath,
                 rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14,
-                fileSizeLimitBytes: 10 * 1024 * 1024,
+                retainedFileCountLimit: loggingOptions.RetentionDays,
+                fileSizeLimitBytes: loggingOptions.FileSizeLimitBytes,
                 rollOnFileSizeLimit: true,
                 shared: true,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}");
@@ -67,9 +69,16 @@ public static class LoggingBootstrapper
         var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder.ClearProviders();
-            builder.SetMinimumLevel(LogLevel.Debug);
+            builder.SetMinimumLevel(ToMicrosoftLogLevel(loggingOptions.MinimumLevel));
             builder.AddSerilog(serilogLogger, dispose: false);
         });
+
+        if (configurationResult.Warning is not null)
+        {
+            loggerFactory
+                .CreateLogger("WhatKey.LoggingBootstrapper")
+                .LogWarning(configurationResult.Exception, configurationResult.Warning);
+        }
 
         return new LoggingContext(loggerFactory, serilogLogger, logDirectory);
     }
@@ -78,6 +87,17 @@ public static class LoggingBootstrapper
     {
         AvaloniaLogger.Sink = new AvaloniaSerilogSink(loggerFactory.CreateLogger("Avalonia"));
     }
+
+    private static LogLevel ToMicrosoftLogLevel(SerilogLogEventLevel level) => level switch
+    {
+        SerilogLogEventLevel.Verbose => LogLevel.Trace,
+        SerilogLogEventLevel.Debug => LogLevel.Debug,
+        SerilogLogEventLevel.Information => LogLevel.Information,
+        SerilogLogEventLevel.Warning => LogLevel.Warning,
+        SerilogLogEventLevel.Error => LogLevel.Error,
+        SerilogLogEventLevel.Fatal => LogLevel.Critical,
+        _ => LogLevel.Debug,
+    };
 }
 
 internal sealed class AvaloniaSerilogSink(MicrosoftLogger logger) : ILogSink

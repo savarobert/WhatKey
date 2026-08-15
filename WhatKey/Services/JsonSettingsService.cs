@@ -11,7 +11,7 @@ public sealed class JsonSettingsService : ISettingsService
 
     public JsonSettingsService(string? filePath = null, ILogger<JsonSettingsService>? logger = null)
     {
-        _filePath = filePath ?? ApplicationPaths.SettingsFilePath;
+        _filePath = filePath ?? ApplicationPaths.UserSettingsPath;
         _logger = logger;
     }
 
@@ -40,6 +40,11 @@ public sealed class JsonSettingsService : ISettingsService
         catch (IOException exception)
         {
             _logger?.LogError(exception, "Failed to load settings from {SettingsPath}; using defaults", _filePath);
+            return new AppSettings();
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            _logger?.LogError(exception, "Access to settings file {SettingsPath} was denied; using defaults", _filePath);
             return new AppSettings();
         }
     }

@@ -63,6 +63,37 @@ public sealed class SettingsAndPositioningTests
         }
     }
 
+    [Fact]
+    public void MissingSettingsUseDefaults()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
+        var loaded = new JsonSettingsService(path).Load();
+
+        Assert.True(loaded.Enabled);
+        Assert.Equal(OverlayPosition.TopCenter, loaded.OverlayPosition);
+        Assert.Equal(1.0, loaded.OverlayScale);
+    }
+
+    [Fact]
+    public void MalformedSettingsUseDefaults()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{ malformed settings");
+            var loaded = new JsonSettingsService(path).Load();
+
+            Assert.True(loaded.Enabled);
+            Assert.Equal(OverlayPosition.TopCenter, loaded.OverlayPosition);
+            Assert.Equal(1.0, loaded.OverlayScale);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
     [Theory]
     [InlineData(OverlayPosition.TopLeft, 124, 124)]
     [InlineData(OverlayPosition.TopCenter, 450, 124)]

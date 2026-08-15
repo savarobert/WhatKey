@@ -58,7 +58,7 @@ public sealed class OverlayService : IOverlayService
         if (!OverlayVisibilityPolicy.ShouldShow(_settings))
             return;
 
-        _dismissCancellation?.Cancel();
+        await _dismissCancellation?.CancelAsync()!;
         _dismissCancellation?.Dispose();
         _dismissCancellation = new CancellationTokenSource();
         var cancellationToken = _dismissCancellation.Token;
