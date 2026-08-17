@@ -10,22 +10,34 @@
         ShowActivated="False"
         CanResize="False"
         Topmost="True"
-        WindowStartupLocation="Manual">
+        WindowStartupLocation="Manual"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent">
     <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
             BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
             BorderThickness="1"
             CornerRadius="12"
             Padding="22,12">
-        <StackPanel Orientation="Horizontal" Spacing="12">
-            <Border Width="36" Height="36" CornerRadius="18"
+        <StackPanel Orientation="Horizontal" 
+                    Spacing="12">
+            <Border Width="36"                  
+                    Height="36" 
+                    CornerRadius="18"
                     Background="{DynamicResource SystemAccentColorBrush}">
-                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                           FontSize="{Binding StateFontSize}" FontWeight="Bold"
-                           Foreground="White" Text="●" />
+                <TextBlock HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"
+                           FontSize="{Binding StateFontSize}" 
+                           FontWeight="Bold"
+                           Foreground="White" 
+                           Text="●" />
             </Border>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock FontSize="{Binding FontSize}" FontWeight="SemiBold" Text="{Binding KeyName}" />
-                <TextBlock FontSize="{Binding StateFontSize}" Opacity="0.75" Text="{Binding StateText}" />
+                <TextBlock FontSize="{Binding FontSize}" 
+                           FontWeight="SemiBold" 
+                           Text="{Binding KeyName}" />
+                <TextBlock FontSize="{Binding StateFontSize}" 
+                           Opacity="0.75" 
+                           Text="{Binding StateText}" />
             </StackPanel>
         </StackPanel>
     </Border>

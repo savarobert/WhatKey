@@ -19,7 +19,7 @@
                       SelectedItem="{Binding SelectedPosition}"
                       DisplayMemberBinding="{Binding DisplayName}" />
 
-            <TextBlock Grid.Row="1" VerticalAlignment="Center" Text="Overlay size" />
+            <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="Overlay size" />
             <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="10">
                 <Slider Width="170" Minimum="0.75" Maximum="2" SmallChange="0.05" LargeChange="0.25"
                         Value="{Binding Scale, Mode=TwoWay}" />
