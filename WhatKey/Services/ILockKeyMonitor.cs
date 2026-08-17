@@ -10,6 +10,6 @@ public sealed class LockKeyChangedEventArgs(LockKey key, bool isOn) : EventArgs
 
 public interface ILockKeyMonitor : IDisposable
 {
-    event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    IObservable<LockKeyChangedEventArgs> StateChanges { get; }
     void Start();
 }

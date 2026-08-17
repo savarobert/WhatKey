@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
 using Microsoft.Extensions.Logging;
+using System.Reactive.Linq;
 using WhatKey.Models;
 using WhatKey.ViewModels;
 using WhatKey.Views;
@@ -18,6 +19,8 @@ public sealed class TrayApplicationController : IDisposable
     private readonly IOverlayService _overlayService;
     private readonly AppSettings _settings;
     private readonly NativeMenuItem _enabledMenuItem;
+    private IDisposable? _lockKeySubscription;
+    private IDisposable? _settingsSubscription;
     private TrayIcon? _trayIcon;
     private SettingsWindow? _settingsWindow;
     private SettingsViewModel? _settingsViewModel;
@@ -44,7 +47,7 @@ public sealed class TrayApplicationController : IDisposable
         _desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
         _desktop.Exit += OnDesktopExit;
         _enabledMenuItem.Click += OnEnabledClicked;
-        _lockKeyMonitor.StateChanged += OnLockKeyStateChanged;
+        _lockKeySubscription = _overlayService.Bind(_lockKeyMonitor.StateChanges);
         _overlayService.ApplySettings(_settings);
         _lockKeyMonitor.Start();
 
@@ -72,7 +75,10 @@ public sealed class TrayApplicationController : IDisposable
             return;
 
         _isDisposed = true;
-        _lockKeyMonitor.StateChanged -= OnLockKeyStateChanged;
+        _lockKeySubscription?.Dispose();
+        _lockKeySubscription = null;
+        _settingsSubscription?.Dispose();
+        _settingsSubscription = null;
         _lockKeyMonitor.Dispose();
         _overlayService.Dispose();
         _settingsViewModel?.Save();
@@ -93,12 +99,6 @@ public sealed class TrayApplicationController : IDisposable
         _logger.LogInformation("Lock-key overlays {State}", _settings.Enabled ? "enabled" : "disabled");
     }
 
-    private void OnLockKeyStateChanged(object? sender, LockKeyChangedEventArgs e)
-    {
-        if (OverlayVisibilityPolicy.ShouldShow(_settings))
-            _overlayService.Show(e.Key, e.IsOn);
-    }
-
     private void ShowSettings()
     {
         if (_settingsWindow is not null)
@@ -109,21 +109,18 @@ public sealed class TrayApplicationController : IDisposable
         }
 
         _settingsViewModel = new SettingsViewModel(_settingsService, _settings);
-        _settingsViewModel.SettingsChanged += OnSettingsChanged;
+        _settingsSubscription = _settingsViewModel.SettingsChanges
+            .Subscribe(_ => _overlayService.ApplySettings(_settings));
         _settingsWindow = new SettingsWindow { DataContext = _settingsViewModel };
         _settingsWindow.Closed += OnSettingsClosed;
         _settingsWindow.Show();
     }
 
-    private void OnSettingsChanged()
-    {
-        _overlayService.ApplySettings(_settings);
-    }
-
     private void OnSettingsClosed(object? sender, EventArgs e)
     {
-        if (_settingsViewModel is not null)
-            _settingsViewModel.SettingsChanged -= OnSettingsChanged;
+        _settingsSubscription?.Dispose();
+        _settingsSubscription = null;
+        _settingsViewModel?.Dispose();
         _settingsWindow!.Closed -= OnSettingsClosed;
         _settingsWindow = null;
         _settingsViewModel = null;

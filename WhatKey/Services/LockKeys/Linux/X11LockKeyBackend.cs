@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using WhatKey.Models;
@@ -19,21 +21,23 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
     private readonly Dictionary<LockKey, bool> _states = new();
     private readonly HashSet<LockKey> _pressedKeys = new();
     private readonly ILogger _logger;
+    private readonly Subject<LockKeyChangedEventArgs> _stateChanges = new();
     private nint _display;
     private int _extensionOpcode;
     private Thread? _eventThread;
     private volatile bool _stopping;
+    private bool _disposed;
 
     public X11LockKeyBackend(ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
     }
 
-    public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    public IObservable<LockKeyChangedEventArgs> StateChanges => _stateChanges.AsObservable();
 
     public bool TryStart()
     {
-        if (!OperatingSystem.IsLinux())
+        if (_disposed || !OperatingSystem.IsLinux())
             return false;
 
         try
@@ -97,6 +101,10 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         _stopping = true;
         if (_eventThread is { IsAlive: true } thread)
             thread.Join(TimeSpan.FromMilliseconds(500));
@@ -108,6 +116,8 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
             _display = 0;
         }
 
+        _stateChanges.OnCompleted();
+        _stateChanges.Dispose();
         _logger.LogInformation("X11 lock-key backend disposed");
     }
 
@@ -169,7 +179,7 @@ internal sealed class X11LockKeyBackend : ILockKeyBackend
 
                     var isOn = !_states.GetValueOrDefault(key);
                     _states[key] = isOn;
-                    StateChanged?.Invoke(this, new LockKeyChangedEventArgs(key, isOn));
+                    _stateChanges.OnNext(new LockKeyChangedEventArgs(key, isOn));
                 }
                 finally
                 {

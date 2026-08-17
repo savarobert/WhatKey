@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -17,8 +19,10 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
 
     private readonly LowLevelKeyboardProc _hookCallback;
     private readonly ILogger<WindowsLockKeyMonitor> _logger;
+    private readonly Subject<LockKeyChangedEventArgs> _stateChanges = new();
     private nint _hookHandle;
     private bool _started;
+    private bool _disposed;
 
     public WindowsLockKeyMonitor(ILogger<WindowsLockKeyMonitor>? logger = null)
     {
@@ -26,11 +30,11 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
         _logger = logger ?? NullLogger<WindowsLockKeyMonitor>.Instance;
     }
 
-    public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    public IObservable<LockKeyChangedEventArgs> StateChanges => _stateChanges.AsObservable();
 
     public void Start()
     {
-        if (_started || !OperatingSystem.IsWindows())
+        if (_started || _disposed || !OperatingSystem.IsWindows())
             return;
 
         _logger.LogInformation("Initializing Windows low-level lock-key monitor");
@@ -53,6 +57,10 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         if (_hookHandle != 0)
         {
             var hookHandle = _hookHandle;
@@ -71,6 +79,8 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
         }
 
         _started = false;
+        _stateChanges.OnCompleted();
+        _stateChanges.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -93,7 +103,7 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
                 {
                     var isOn = (GetKeyState(hookData.VkCode) & 1) != 0;
                     _logger.LogDebug("{LockKey} state changed to {State}", key.Value, isOn ? "ON" : "OFF");
-                    StateChanged?.Invoke(this, new LockKeyChangedEventArgs(key.Value, isOn));
+                    _stateChanges.OnNext(new LockKeyChangedEventArgs(key.Value, isOn));
                 }
             }
         }

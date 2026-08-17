@@ -5,5 +5,5 @@ namespace WhatKey.Services;
 public interface IOverlayService : IDisposable
 {
     void ApplySettings(AppSettings settings);
-    void Show(LockKey key, bool isOn);
+    IDisposable Bind(IObservable<LockKeyChangedEventArgs> updates);
 }

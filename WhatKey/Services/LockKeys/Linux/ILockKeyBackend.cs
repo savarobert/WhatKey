@@ -2,6 +2,6 @@ namespace WhatKey.Services;
 
 internal interface ILockKeyBackend : IDisposable
 {
-    event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    IObservable<LockKeyChangedEventArgs> StateChanges { get; }
     bool TryStart();
 }

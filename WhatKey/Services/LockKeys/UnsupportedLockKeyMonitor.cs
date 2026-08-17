@@ -2,11 +2,8 @@ namespace WhatKey.Services;
 
 public sealed class UnsupportedLockKeyMonitor : ILockKeyMonitor
 {
-    public event EventHandler<LockKeyChangedEventArgs>? StateChanged
-    {
-        add { }
-        remove { }
-    }
+    public IObservable<LockKeyChangedEventArgs> StateChanges =>
+        System.Reactive.Linq.Observable.Empty<LockKeyChangedEventArgs>();
 
     public void Start()
     {

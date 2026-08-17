@@ -1,4 +1,6 @@
 using System.Runtime.InteropServices;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Microsoft.Win32.SafeHandles;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,20 +24,22 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
 
     private readonly Dictionary<LockKey, bool> _states = new();
     private readonly ILogger _logger;
+    private readonly Subject<LockKeyChangedEventArgs> _stateChanges = new();
     private FileStream? _stream;
     private Thread? _readerThread;
     private volatile bool _stopping;
+    private bool _disposed;
 
     internal LinuxEvdevLockKeyBackend(ILogger? logger = null)
     {
         _logger = logger ?? NullLogger.Instance;
     }
 
-    public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    public IObservable<LockKeyChangedEventArgs> StateChanges => _stateChanges.AsObservable();
 
     public bool TryStart()
     {
-        if (!OperatingSystem.IsLinux())
+        if (_disposed || !OperatingSystem.IsLinux())
             return false;
 
         try
@@ -92,6 +96,10 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         _stopping = true;
         _stream?.Dispose();
         if (_readerThread is { IsAlive: true } thread)
@@ -99,6 +107,8 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
 
         _readerThread = null;
         _stream = null;
+        _stateChanges.OnCompleted();
+        _stateChanges.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -144,7 +154,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
         {
             var isOn = !_states.GetValueOrDefault(key);
             _states[key] = isOn;
-            StateChanged?.Invoke(this, new LockKeyChangedEventArgs(key, isOn));
+            _stateChanges.OnNext(new LockKeyChangedEventArgs(key, isOn));
         }
         else if (type == EvLed && TryMapLed(code, out var ledKey))
         {
@@ -152,7 +162,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
             if (!_states.TryGetValue(ledKey, out var previous) || previous != isOn)
             {
                 _states[ledKey] = isOn;
-                StateChanged?.Invoke(this, new LockKeyChangedEventArgs(ledKey, isOn));
+                _stateChanges.OnNext(new LockKeyChangedEventArgs(ledKey, isOn));
             }
         }
     }
