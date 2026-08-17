@@ -110,7 +110,9 @@ internal static class LinuxLockKeyBackendFactory
 
         if (isWayland)
         {
-            logger.LogInformation("Detected Wayland; using evdev-compatible global input backend");
+            logger.LogInformation("Detected Wayland; trying sysfs lock-key backend before evdev");
+            yield return new SysfsLockKeyBackend(logger);
+            logger.LogDebug("Probing Linux evdev lock-key fallback");
             yield return new WaylandEvdevLockKeyBackend(logger);
             yield break;
         }

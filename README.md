@@ -15,7 +15,7 @@ dotnet publish WhatKey/WhatKey.csproj -c Release -r linux-x64
 
 On X11, WhatKey uses the XInput2 raw-key event extension when `libX11.so.6` and `libXi.so.6` are available. If XInput2 cannot be used, it falls back to the evdev backend.
 
-On Wayland, arbitrary global keyboard hooks are intentionally restricted by the protocol. WhatKey therefore uses the evdev input-device backend. The user must be able to read `/dev/input/event*`; on many distributions this means adding the user to the `input` group and starting a new login session. No root privileges are required to launch the application when that permission is already granted.
+On Wayland, arbitrary global keyboard hooks are intentionally restricted by the protocol. WhatKey first uses the lock-key LED state exposed by `/sys/class/leds`, which normally works for an unprivileged user. If the compositor or kernel does not expose usable sysfs LEDs, it falls back to the evdev input-device backend. The evdev fallback may require read access to `/dev/input/event*` (for example, through a distribution-specific device-permission rule or membership of the `input` group). No root privileges are required to launch the application.
 
 If the display server, native libraries, or input-device permissions do not allow monitoring, WhatKey logs the reason and continues running in the tray with only lock-key monitoring disabled. The rest of the application remains available.
 
