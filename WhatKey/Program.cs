@@ -1,6 +1,7 @@
 using Avalonia;
 using Microsoft.Extensions.Logging;
 using ReactiveUI.Avalonia;
+using System.Reflection;
 using WhatKey.Services;
 
 namespace WhatKey;
@@ -24,11 +25,12 @@ sealed class Program
 
         var platformName = OperatingSystem.IsWindows() ? "Windows" :
                            OperatingSystem.IsLinux() ? "Linux" :
-                           Environment.OSVersion.Platform.ToString();
+                           OperatingSystem.IsMacOS() ? "macOS" :
+                           "Unknown";
 
         logger.LogInformation(
             "Application starting. Version: {Version}; Platform: {Platform}; LogDirectory: {LogDirectory}",
-            typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
+            GetApplicationVersion(),
             platformName,
             logging.LogDirectory);
 
@@ -52,4 +54,13 @@ sealed class Program
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .UseReactiveUI(_ => { });
+
+    private static string GetApplicationVersion()
+    {
+        var assembly = typeof(Program).Assembly;
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        return !string.IsNullOrWhiteSpace(informationalVersion)
+            ? informationalVersion
+            : assembly.GetName().Version?.ToString() ?? "unknown";
+    }
 }

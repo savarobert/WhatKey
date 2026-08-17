@@ -32,6 +32,29 @@ env:
   RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
 
 jobs:
+  resolve-version:
+    name: Resolve release version
+    runs-on: ubuntu-latest
+    outputs:
+      release_version: ${{ steps.version.outputs.release_version }}
+    steps:
+      - name: Derive version from release tag
+        id: version
+        env:
+          RELEASE_TAG: ${{ env.RELEASE_TAG }}
+        run: |
+          if [[ "$RELEASE_TAG" == v* ]]; then
+            release_version="${RELEASE_TAG#v}"
+            if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Release tag must contain a semantic version after the leading v: $RELEASE_TAG" >&2
+              exit 1
+            fi
+          else
+            release_version=""
+          fi
+
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+
   validate:
     name: Validate (${{ matrix.os }})
     strategy:
@@ -72,7 +95,9 @@ jobs:
 
   validate-aot:
     name: Validate Native AOT (${{ matrix.rid }})
-    needs: validate
+    needs:
+      - validate
+      - resolve-version
     strategy:
       fail-fast: false
       matrix:
@@ -107,7 +132,17 @@ jobs:
         run: |
           $publishDir = Join-Path $env:GITHUB_WORKSPACE "artifacts/aot-$env:RID"
           New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
-          dotnet publish "$env:APP_PROJECT" --configuration Release --runtime "$env:RID" --no-restore --output $publishDir
+          $versionProperties = @()
+          if (-not [string]::IsNullOrWhiteSpace($env:RELEASE_VERSION)) {
+            $versionProperties = @(
+              "/p:Version=$env:RELEASE_VERSION",
+              "/p:AssemblyVersion=${env:RELEASE_VERSION}.0",
+              "/p:FileVersion=${env:RELEASE_VERSION}.0",
+              "/p:InformationalVersion=$env:RELEASE_VERSION",
+              "/p:IncludeSourceRevisionInInformationalVersion=false"
+            )
+          }
+          dotnet publish "$env:APP_PROJECT" --configuration Release --runtime "$env:RID" @versionProperties --no-restore --output $publishDir
           $executableName = if ($env:RID -eq 'win-x64') { "$env:APP_NAME.exe" } else { $env:APP_NAME }
           if (-not (Test-Path (Join-Path $publishDir $executableName))) {
             throw "Native AOT executable was not produced for $env:RID"
@@ -115,13 +150,16 @@ jobs:
         shell: pwsh
         env:
           RID: ${{ matrix.rid }}
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
 
   publish-windows:
     name: Publish Windows x64
     if: >-
       (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
       github.event_name == 'workflow_dispatch'
-    needs: validate-aot
+    needs:
+      - validate-aot
+      - resolve-version
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -148,11 +186,23 @@ jobs:
         run: |
           $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts/windows-x64'
           New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
-          dotnet publish "$env:APP_PROJECT" --configuration Release --runtime win-x64 --no-restore --output $publishDir
+          $versionProperties = @()
+          if (-not [string]::IsNullOrWhiteSpace($env:RELEASE_VERSION)) {
+            $versionProperties = @(
+              "/p:Version=$env:RELEASE_VERSION",
+              "/p:AssemblyVersion=${env:RELEASE_VERSION}.0",
+              "/p:FileVersion=${env:RELEASE_VERSION}.0",
+              "/p:InformationalVersion=$env:RELEASE_VERSION",
+              "/p:IncludeSourceRevisionInInformationalVersion=false"
+            )
+          }
+          dotnet publish "$env:APP_PROJECT" --configuration Release --runtime win-x64 @versionProperties --no-restore --output $publishDir
           Get-ChildItem -Path $publishDir -File |
             Where-Object { $_.Extension -in '.pdb', '.dbg' } |
             Remove-Item -Force
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
 
       # Future Windows code signing belongs between publish and packaging.
       - name: Package Windows application
@@ -174,7 +224,9 @@ jobs:
     if: >-
       (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
       github.event_name == 'workflow_dispatch'
-    needs: validate-aot
+    needs:
+      - validate-aot
+      - resolve-version
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -197,10 +249,22 @@ jobs:
         run: dotnet restore "$SOLUTION"
 
       - name: Publish Linux application
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
         run: |
           publish_dir="$GITHUB_WORKSPACE/artifacts/linux-x64"
           mkdir -p "$publish_dir"
-          dotnet publish "$APP_PROJECT" --configuration Release --runtime linux-x64 --no-restore --output "$publish_dir"
+          version_properties=()
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            version_properties+=(
+              "/p:Version=$RELEASE_VERSION"
+              "/p:AssemblyVersion=$RELEASE_VERSION.0"
+              "/p:FileVersion=$RELEASE_VERSION.0"
+              "/p:InformationalVersion=$RELEASE_VERSION"
+              "/p:IncludeSourceRevisionInInformationalVersion=false"
+            )
+          fi
+          dotnet publish "$APP_PROJECT" --configuration Release --runtime linux-x64 "${version_properties[@]}" --no-restore --output "$publish_dir"
           test -f "$publish_dir/$APP_NAME"
           find "$publish_dir" -type f \( -name '*.pdb' -o -name '*.dbg' \) -delete
           chmod +x "$publish_dir/$APP_NAME"
