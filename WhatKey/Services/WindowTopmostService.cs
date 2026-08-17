@@ -34,31 +34,38 @@ internal sealed class WindowsWindowTopmostService(ILogger logger) : IWindowTopmo
 
     public void EnsureTopmost(Window window)
     {
-        var platformHandle = window.TryGetPlatformHandle();
-        if (platformHandle is null)
+        try
         {
-            logger.LogDebug("Overlay native handle is not available for topmost reassertion");
-            return;
-        }
+            var platformHandle = window.TryGetPlatformHandle();
+            if (platformHandle is null)
+            {
+                logger.LogDebug("Overlay native handle is not available for topmost reassertion");
+                return;
+            }
 
-        if (!string.Equals(platformHandle.HandleDescriptor, "HWND", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(platformHandle.HandleDescriptor, "HWND", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogDebug(
+                    "Skipping Windows topmost reassertion because the platform handle is {HandleDescriptor}",
+                    platformHandle.HandleDescriptor);
+                return;
+            }
+
+            var flags = SwpNoMove | SwpNoSize | SwpNoActivate;
+            if (SetWindowPos(platformHandle.Handle, HwndTopmost, 0, 0, 0, 0, flags))
+            {
+                logger.LogDebug("Reasserted overlay topmost state");
+                return;
+            }
+
+            logger.LogWarning(
+                "Failed to reassert overlay topmost state with SetWindowPos; Win32 error {ErrorCode}",
+                Marshal.GetLastWin32Error());
+        }
+        catch (Exception exception)
         {
-            logger.LogDebug(
-                "Skipping Windows topmost reassertion because the platform handle is {HandleDescriptor}",
-                platformHandle.HandleDescriptor);
-            return;
+            logger.LogWarning(exception, "Failed to reassert overlay topmost state");
         }
-
-        var flags = SwpNoMove | SwpNoSize | SwpNoActivate;
-        if (SetWindowPos(platformHandle.Handle, HwndTopmost, 0, 0, 0, 0, flags))
-        {
-            logger.LogDebug("Reasserted overlay topmost state");
-            return;
-        }
-
-        logger.LogWarning(
-            "Failed to reassert overlay topmost state with SetWindowPos; Win32 error {ErrorCode}",
-            Marshal.GetLastWin32Error());
     }
 
     [DllImport("user32.dll", SetLastError = true)]

@@ -19,6 +19,7 @@ public sealed class OverlayService : IOverlayService
     private readonly IWindowTopmostService _windowTopmostService;
     private CancellationTokenSource? _dismissCancellation;
     private AppSettings _settings = new();
+    private bool _disposed;
 
     public OverlayService(ILogger<OverlayService>? logger = null)
     {
@@ -44,16 +45,42 @@ public sealed class OverlayService : IOverlayService
         return updates
             .Subscribe(
                 update =>
-                    Dispatcher.UIThread.Post(() =>
+                {
+                    _logger.LogDebug(
+                        "Lock-key event received by overlay pipeline: {Key} IsOn={IsOn}",
+                        update.Key,
+                        update.IsOn);
+
+                    try
                     {
-                        if (OverlayVisibilityPolicy.ShouldShow(_settings))
-                            _ = ShowOnUiThreadAsync(update.Key, update.IsOn);
-                    }),
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            var enabled = OverlayVisibilityPolicy.ShouldShow(_settings);
+                            _logger.LogDebug(
+                                "Overlay requested: {Key} {State}; enabled state: {Enabled}",
+                                update.Key,
+                                update.IsOn ? "ON" : "OFF",
+                                enabled);
+
+                            if (enabled && !_disposed)
+                                _ = ShowOnUiThreadAsync(update.Key, update.IsOn);
+                        });
+                        _logger.LogDebug("Dispatched overlay request to Avalonia UI thread");
+                    }
+                    catch (Exception exception)
+                    {
+                        _logger.LogError(exception, "Failed to dispatch lock-key overlay request");
+                    }
+                },
                 exception => _logger.LogError(exception, "Lock-key overlay update stream failed"));
     }
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         _dismissCancellation?.Cancel();
         _dismissCancellation?.Dispose();
         _window.Close();
@@ -61,37 +88,57 @@ public sealed class OverlayService : IOverlayService
 
     private async Task ShowOnUiThreadAsync(LockKey key, bool isOn)
     {
-        if (!OverlayVisibilityPolicy.ShouldShow(_settings))
-            return;
-
-        await _dismissCancellation?.CancelAsync()!;
-        _dismissCancellation?.Dispose();
-        _dismissCancellation = new CancellationTokenSource();
-        var cancellationToken = _dismissCancellation.Token;
-
-        _viewModel.Show(key, isOn);
-        _logger.LogDebug("Showing lock-key overlay for {Key}; enabled state: {IsOn}", key, isOn);
-        if (!_window.IsVisible)
-        {
-            _window.Opacity = 0;
-            _window.Topmost = true;
-            _window.Show();
-            PositionWindow();
-            _windowTopmostService.EnsureTopmost(_window);
-            _window.Opacity = 1;
-        }
-        else
-        {
-            PositionWindow();
-            _window.Topmost = true;
-            _windowTopmostService.EnsureTopmost(_window);
-        }
-
         try
         {
+            if (_disposed || !OverlayVisibilityPolicy.ShouldShow(_settings))
+                return;
+
+            var previousDismissal = _dismissCancellation;
+            var currentDismissal = new CancellationTokenSource();
+            _dismissCancellation = currentDismissal;
+            if (previousDismissal is not null)
+            {
+                await previousDismissal.CancelAsync();
+                previousDismissal.Dispose();
+            }
+
+            // A newer event may have replaced this source while the previous
+            // cancellation callbacks were completing asynchronously.
+            if (_disposed || !ReferenceEquals(currentDismissal, _dismissCancellation))
+            {
+                currentDismissal.Dispose();
+                return;
+            }
+
+            var cancellationToken = currentDismissal.Token;
+
+            _logger.LogDebug("Executing overlay show on Avalonia UI thread for {Key} IsOn={IsOn}", key, isOn);
+            _viewModel.Show(key, isOn);
+            if (!_window.IsVisible)
+            {
+                _window.Opacity = 0;
+                _window.Topmost = true;
+                _window.Show();
+                _logger.LogDebug("OverlayWindow.Show completed; IsVisible={IsVisible}", _window.IsVisible);
+                PositionWindow();
+                _windowTopmostService.EnsureTopmost(_window);
+                _window.Opacity = 1;
+            }
+            else
+            {
+                PositionWindow();
+                _window.Topmost = true;
+                _windowTopmostService.EnsureTopmost(_window);
+            }
+
+            _logger.LogDebug("Overlay topmost state reasserted; IsVisible={IsVisible}", _window.IsVisible);
+
             await Task.Delay(TimeSpan.FromMilliseconds(1300), cancellationToken);
-            if (!cancellationToken.IsCancellationRequested)
+            if (!cancellationToken.IsCancellationRequested && !_disposed)
+            {
                 _window.Hide();
+                _logger.LogDebug("OverlayWindow.Hide completed; IsVisible={IsVisible}", _window.IsVisible);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -99,7 +146,7 @@ public sealed class OverlayService : IOverlayService
         }
         catch (Exception exception)
         {
-            _logger.LogError(exception, "Failed to display lock-key overlay");
+            _logger.LogError(exception, "Failed to display lock-key overlay for {Key}", key);
         }
     }
 
@@ -110,5 +157,15 @@ public sealed class OverlayService : IOverlayService
         var workArea = ScreenPositioningService.GetActiveWorkArea(_window);
         var position = ScreenPositioningService.CalculatePosition(workArea, width, height, _settings.OverlayPosition);
         _window.Position = new PixelPoint(position.X, position.Y);
+        _logger.LogDebug(
+            "Overlay position calculated: X={X}, Y={Y}, Width={Width}, Height={Height}, WorkArea=({WorkAreaX},{WorkAreaY},{WorkAreaWidth},{WorkAreaHeight})",
+            position.X,
+            position.Y,
+            width,
+            height,
+            workArea.X,
+            workArea.Y,
+            workArea.Width,
+            workArea.Height);
     }
 }
