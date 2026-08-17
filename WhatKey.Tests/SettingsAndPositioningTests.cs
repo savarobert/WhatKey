@@ -93,7 +93,7 @@ public sealed class SettingsAndPositioningTests
         var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
         try
         {
-            File.WriteAllText(path, "{\"Enabled\":false,\"OverlayPosition\":\"BottomRight\",\"OverlayScale\":1.5}");
+            File.WriteAllText(path, "{\"Enabled\":false,\"OverlayPosition\":8,\"OverlayScale\":1.5}");
 
             var loaded = new JsonSettingsService(path).Load();
 
