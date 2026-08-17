@@ -1,5 +1,7 @@
 using ReactiveUI;
 using ReactiveUI.Primitives;
+using System.Reactive;
+using System.Reactive.Subjects;
 using WhatKey.Models;
 using WhatKey.Services;
 
@@ -11,12 +13,14 @@ public sealed class OverlayPositionOption(OverlayPosition value, string displayN
     public string DisplayName { get; } = displayName;
 }
 
-public sealed class SettingsViewModel : ViewModelBase
+public sealed class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly ISettingsService _settingsService;
     private readonly AppSettings _settings;
     private OverlayPositionOption _selectedPosition;
     private double _scale;
+    private readonly Subject<Unit> _settingsChanges = new();
+    private bool _isDisposed;
 
     public SettingsViewModel(ISettingsService settingsService, AppSettings settings)
     {
@@ -27,7 +31,7 @@ public sealed class SettingsViewModel : ViewModelBase
         CloseCommand = ReactiveCommand.Create(() => { });
     }
 
-    public event Action? SettingsChanged;
+    public IObservable<Unit> SettingsChanges => _settingsChanges;
 
     public IReadOnlyList<OverlayPositionOption> Positions { get; } =
         Enum.GetValues<OverlayPosition>()
@@ -69,7 +73,20 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public void Save()
     {
+        if (_isDisposed)
+            return;
+
         _settingsService.Save(_settings);
-        SettingsChanged?.Invoke();
+        _settingsChanges.OnNext(Unit.Default);
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+            return;
+
+        _isDisposed = true;
+        _settingsChanges.OnCompleted();
+        _settingsChanges.Dispose();
     }
 }

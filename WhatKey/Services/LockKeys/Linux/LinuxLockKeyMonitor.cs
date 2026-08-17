@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using WhatKey.Models;
 
 namespace WhatKey.Services;
@@ -7,8 +9,11 @@ namespace WhatKey.Services;
 public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
 {
     private ILockKeyBackend? _backend;
+    private IDisposable? _backendSubscription;
     private readonly ILogger<LinuxLockKeyMonitor> _logger;
+    private readonly Subject<LockKeyChangedEventArgs> _stateChanges = new();
     private bool _started;
+    private bool _disposed;
 
     public LinuxLockKeyMonitor(ILoggerFactory? loggerFactory = null)
     {
@@ -16,11 +21,11 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
         _logger.LogInformation("Linux lock-key monitor initializing");
     }
 
-    public event EventHandler<LockKeyChangedEventArgs>? StateChanged;
+    public IObservable<LockKeyChangedEventArgs> StateChanges => _stateChanges.AsObservable();
 
     public void Start()
     {
-        if (_started || !OperatingSystem.IsLinux())
+        if (_started || _disposed || !OperatingSystem.IsLinux())
             return;
 
         _started = true;
@@ -28,7 +33,7 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
         {
             try
             {
-                candidate.StateChanged += OnBackendStateChanged;
+                _backendSubscription = candidate.StateChanges.Subscribe(OnBackendStateChanged);
                 if (candidate.TryStart())
                 {
                     _backend = candidate;
@@ -36,19 +41,22 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
                     return;
                 }
 
-                candidate.StateChanged -= OnBackendStateChanged;
+                _backendSubscription.Dispose();
+                _backendSubscription = null;
                 candidate.Dispose();
             }
             catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException or IOException)
             {
                 _logger.LogWarning(exception, "Linux lock-key backend {Backend} is unavailable", candidate.GetType().Name);
-                candidate.StateChanged -= OnBackendStateChanged;
+                _backendSubscription?.Dispose();
+                _backendSubscription = null;
                 candidate.Dispose();
             }
             catch (Exception exception)
             {
                 _logger.LogError(exception, "Linux lock-key backend {Backend} failed", candidate.GetType().Name);
-                candidate.StateChanged -= OnBackendStateChanged;
+                _backendSubscription?.Dispose();
+                _backendSubscription = null;
                 candidate.Dispose();
             }
         }
@@ -58,19 +66,26 @@ public sealed class LinuxLockKeyMonitor : ILockKeyMonitor
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         if (_backend is not null)
         {
-            _backend.StateChanged -= OnBackendStateChanged;
+            _backendSubscription?.Dispose();
+            _backendSubscription = null;
             _backend.Dispose();
             _backend = null;
         }
 
         _logger.LogInformation("Linux lock-key monitor disposed");
         _started = false;
+        _stateChanges.OnCompleted();
+        _stateChanges.Dispose();
         GC.SuppressFinalize(this);
     }
 
-    private void OnBackendStateChanged(object? sender, LockKeyChangedEventArgs e) => StateChanged?.Invoke(this, e);
+    private void OnBackendStateChanged(LockKeyChangedEventArgs e) => _stateChanges.OnNext(e);
 }
 
 internal static class LinuxLockKeyBackendFactory

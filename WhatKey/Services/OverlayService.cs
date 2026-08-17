@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
+using System.Reactive.Linq;
 using WhatKey.Models;
 using WhatKey.ViewModels;
 using WhatKey.Views;
@@ -38,12 +39,17 @@ public sealed class OverlayService : IOverlayService
             PositionWindow();
     }
 
-    public void Show(LockKey key, bool isOn)
+    public IDisposable Bind(IObservable<LockKeyChangedEventArgs> updates)
     {
-        if (!OverlayVisibilityPolicy.ShouldShow(_settings))
-            return;
-
-        Dispatcher.UIThread.Post(() => _ = ShowOnUiThreadAsync(key, isOn));
+        return updates
+            .Subscribe(
+                update =>
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        if (OverlayVisibilityPolicy.ShouldShow(_settings))
+                            _ = ShowOnUiThreadAsync(update.Key, update.IsOn);
+                    }),
+                exception => _logger.LogError(exception, "Lock-key overlay update stream failed"));
     }
 
     public void Dispose()
