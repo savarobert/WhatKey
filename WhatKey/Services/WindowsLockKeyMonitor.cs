@@ -127,8 +127,8 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
         public nint DwExtraInfo;
     }
 
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private  static partial nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint moduleHandle, uint threadId);
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
+    private static partial nint SetWindowsHookEx(int idHook, LowLevelKeyboardProc callback, nint moduleHandle, uint threadId);
 
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -137,7 +137,7 @@ public sealed partial class WindowsLockKeyMonitor : ILockKeyMonitor
     [LibraryImport("user32.dll")]
     private static partial nint CallNextHookEx(nint hookHandle, int code, nint wParam, nint lParam);
 
-    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     private static partial nint GetModuleHandle(string? moduleName);
 
     [LibraryImport("user32.dll")]
