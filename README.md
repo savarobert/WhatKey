@@ -11,13 +11,113 @@ dotnet publish WhatKey/WhatKey.csproj -c Release -r win-x64
 dotnet publish WhatKey/WhatKey.csproj -c Release -r linux-x64
 ```
 
-## Linux global keyboard monitoring
+## Linux
+
+### Running WhatKey
+
+WhatKey supports Linux on both Wayland and X11 where the current platform backends are available. Download and extract the published `linux-x64` archive, then run the `WhatKey` executable. A traditional installer is not required.
+
+The Linux distribution is portable and keeps its configuration and diagnostics beside the executable:
+
+```text
+WhatKey/
+├── WhatKey
+├── appsettings.json
+├── settings.json
+└── logs/
+```
+
+### GNOME
+
+GNOME does not display AppIndicator or StatusNotifierItem tray icons by default. WhatKey uses Avalonia's tray-icon implementation, so GNOME users should install the **AppIndicator and KStatusNotifierItem Support** GNOME Shell extension. It provides access to the WhatKey tray icon, Settings, Enable / Disable, and Exit.
+
+#### Fedora
+
+Install the extension package:
+
+```bash
+sudo dnf install gnome-shell-extension-appindicator
+```
+
+After installing it, log out of GNOME and log back in. This is especially important on Wayland: restarting GNOME Shell with `Alt+F2`, then `r`, is not the recommended solution there. A full logout/login reliably reloads newly installed system-wide GNOME Shell extensions.
+
+Verify that the extension is installed:
+
+```bash
+gnome-extensions list | grep appindicator
+```
+
+The expected extension ID is:
+
+```text
+appindicatorsupport@rgcjonas.gmail.com
+```
+
+If necessary, enable it manually and check its state:
+
+```bash
+gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
+gnome-extensions info appindicatorsupport@rgcjonas.gmail.com
+```
+
+Once the extension is active, the WhatKey tray icon should appear in the GNOME top bar.
+
+### Other desktop environments
+
+Some Linux desktop environments, including KDE Plasma, support StatusNotifierItem/AppIndicator tray icons natively and may not require an additional extension. Tray behavior depends on the desktop environment and its panel configuration.
+
+### Lock-key monitoring
+
+WhatKey prefers a non-privileged backend whenever one is available.
 
 On X11, WhatKey uses the XInput2 raw-key event extension when `libX11.so.6` and `libXi.so.6` are available. If XInput2 cannot be used, it falls back to the evdev backend.
 
-On Wayland, arbitrary global keyboard hooks are intentionally restricted by the protocol. WhatKey first uses the lock-key LED state exposed by `/sys/class/leds`, which normally works for an unprivileged user. If the compositor or kernel does not expose usable sysfs LEDs, it falls back to the evdev input-device backend. The evdev fallback may require read access to `/dev/input/event*` (for example, through a distribution-specific device-permission rule or membership of the `input` group). No root privileges are required to launch the application.
+On Wayland, arbitrary global keyboard hooks are intentionally restricted by the protocol. WhatKey first attempts to read lock-key LED state from `/sys/class/leds/`, which normally requires no special permissions. If sysfs does not expose usable LEDs, it may fall back to an evdev input-device backend using `/dev/input/event*`.
 
-If the display server, native libraries, or input-device permissions do not allow monitoring, WhatKey logs the reason and continues running in the tray with only lock-key monitoring disabled. The rest of the application remains available.
+Access to evdev devices can be restricted by the Linux distribution. These permissions are relevant only when the sysfs backend is unavailable; most users should not need to change input-device permissions. Raw `/dev/input` keyboard access also has security implications, so broad permission changes should be treated as an advanced troubleshooting step rather than the default setup.
+
+If the display server, native libraries, or input-device permissions do not allow monitoring, WhatKey logs the reason and continues running in the tray with lock-key monitoring disabled. The rest of the application remains available.
+
+### Troubleshooting
+
+#### Tray icon missing on GNOME
+
+Check whether the AppIndicator extension is installed and enabled:
+
+```bash
+gnome-extensions list | grep appindicator
+gnome-extensions info appindicatorsupport@rgcjonas.gmail.com
+```
+
+If the extension was just installed, log out of GNOME and log back in before checking again.
+
+#### Check the session type
+
+```bash
+echo $XDG_SESSION_TYPE
+```
+
+Typical output is `wayland` or `x11`.
+
+#### Check or stop WhatKey
+
+Check whether WhatKey is still running:
+
+```bash
+pgrep -a WhatKey
+```
+
+If the tray icon is unavailable, stop it with the normal termination signal:
+
+```bash
+pkill WhatKey
+```
+
+`pkill -9` is not recommended for normal shutdown.
+
+#### Logs
+
+Linux diagnostics are stored in `logs/` next to the application executable. Include the relevant log files when reporting a problem.
 
 ## Logging
 

@@ -17,7 +17,7 @@ public sealed class OverlayService : IOverlayService
     private readonly ILogger<OverlayService> _logger;
     private readonly OverlayViewModel _viewModel;
     private readonly IWindowTopmostService _windowTopmostService;
-    private CancellationTokenSource? _dismissCancellation;
+    private readonly OverlayDismissalCoordinator _dismissalCoordinator = new();
     private AppSettings _settings = new();
     private bool _disposed;
 
@@ -81,8 +81,7 @@ public sealed class OverlayService : IOverlayService
             return;
 
         _disposed = true;
-        _dismissCancellation?.Cancel();
-        _dismissCancellation?.Dispose();
+        _dismissalCoordinator.Dispose();
         _window.Close();
     }
 
@@ -92,25 +91,6 @@ public sealed class OverlayService : IOverlayService
         {
             if (_disposed || !OverlayVisibilityPolicy.ShouldShow(_settings))
                 return;
-
-            var previousDismissal = _dismissCancellation;
-            var currentDismissal = new CancellationTokenSource();
-            _dismissCancellation = currentDismissal;
-            if (previousDismissal is not null)
-            {
-                await previousDismissal.CancelAsync();
-                previousDismissal.Dispose();
-            }
-
-            // A newer event may have replaced this source while the previous
-            // cancellation callbacks were completing asynchronously.
-            if (_disposed || !ReferenceEquals(currentDismissal, _dismissCancellation))
-            {
-                currentDismissal.Dispose();
-                return;
-            }
-
-            var cancellationToken = currentDismissal.Token;
 
             _logger.LogDebug("Executing overlay show on Avalonia UI thread for {Key} IsOn={IsOn}", key, isOn);
             _viewModel.Show(key, isOn);
@@ -133,12 +113,18 @@ public sealed class OverlayService : IOverlayService
 
             _logger.LogDebug("Overlay topmost state reasserted; IsVisible={IsVisible}", _window.IsVisible);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(_settings.OverlayDurationMs), cancellationToken);
-            if (!cancellationToken.IsCancellationRequested && !_disposed)
-            {
-                _window.Hide();
-                _logger.LogDebug("OverlayWindow.Hide completed; IsVisible={IsVisible}", _window.IsVisible);
-            }
+            await _dismissalCoordinator.RunAsync(
+                TimeSpan.FromMilliseconds(_settings.OverlayDurationMs),
+                () =>
+                {
+                    if (!_disposed && _window.IsVisible)
+                    {
+                        _window.Hide();
+                        _logger.LogDebug("OverlayWindow.Hide completed; IsVisible={IsVisible}", _window.IsVisible);
+                    }
+
+                    return Task.CompletedTask;
+                });
         }
         catch (OperationCanceledException)
         {
