@@ -247,10 +247,69 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG"
+          retry() {
+            local attempts=5
+            local delay=10
+            local i status
+
+            for ((i=1; i<=attempts; i++)); do
+              if "$@"; then
+                return 0
+              else
+                status=$?
+              fi
+
+              if ((i < attempts)); then
+                echo "GitHub API command failed (attempt $i/$attempts). Retrying in ${delay} seconds..."
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+
+            return "$status"
+          }
+
+          check_release() {
+            local attempts=5
+            local delay=10
+            local i status response
+
+            for ((i=1; i<=attempts; i++)); do
+              if response=$(gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" 2>&1); then
+                return 0
+              else
+                status=$?
+              fi
+
+              # A 404 is the only failure that means the release is genuinely missing.
+              if [[ "$response" == *"HTTP 404"* ]]; then
+                release_missing=true
+                return 1
+              fi
+
+              echo "GitHub release check failed (attempt $i/$attempts)."
+              printf '%s\n' "$response"
+              if ((i < attempts)); then
+                echo "Retrying in ${delay} seconds..."
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+
+            return "$status"
+          }
+
+          release_missing=false
+          if check_release; then
+            retry gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG"
           else
-            gh release create "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --generate-notes
+            check_status=$?
+            if [ "$release_missing" = true ]; then
+              retry gh release create "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --generate-notes
+            else
+              echo "Unable to determine whether GitHub release $RELEASE_TAG exists after retries."
+              exit "$check_status"
+            fi
           fi
 
       - name: Upload release assets
@@ -258,7 +317,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release upload "$RELEASE_TAG" \
+          retry() {
+            local attempts=5
+            local delay=10
+            local i status
+
+            for ((i=1; i<=attempts; i++)); do
+              if "$@"; then
+                return 0
+              else
+                status=$?
+              fi
+
+              if ((i < attempts)); then
+                echo "GitHub API command failed (attempt $i/$attempts). Retrying in ${delay} seconds..."
+                sleep "$delay"
+                delay=$((delay * 2))
+              fi
+            done
+
+            return "$status"
+          }
+
+          retry gh release upload "$RELEASE_TAG" \
             --repo "$GH_REPO" \
             "release-assets/$APP_NAME-$RELEASE_TAG-win-x64.zip" \
             "release-assets/$APP_NAME-$RELEASE_TAG-linux-x64.tar.gz" \
