@@ -21,8 +21,11 @@ public sealed class JsonSettingsService : ISettingsService
         {
             if (!File.Exists(_filePath))
             {
-                _logger?.LogInformation("Settings file not found; using defaults");
-                return new AppSettings();
+                var defaults = new AppSettings();
+                _logger?.LogInformation("Settings file not found; creating default settings file");
+                if (TrySave(defaults))
+                    _logger?.LogInformation("Default settings file created");
+                return defaults;
             }
 
             var settings = JsonSerializer.Deserialize(
@@ -50,6 +53,9 @@ public sealed class JsonSettingsService : ISettingsService
     }
 
     public void Save(AppSettings settings)
+        => TrySave(settings);
+
+    private bool TrySave(AppSettings settings)
     {
         try
         {
@@ -61,10 +67,12 @@ public sealed class JsonSettingsService : ISettingsService
                 _filePath,
                 JsonSerializer.Serialize(Normalize(settings), AppSettingsJsonContext.Default.AppSettings));
             _logger?.LogDebug("Settings saved to {SettingsPath}", _filePath);
+            return true;
         }
         catch (Exception exception)
         {
             _logger?.LogError(exception, "Failed to save settings to {SettingsPath}", _filePath);
+            return false;
         }
     }
 
@@ -73,6 +81,7 @@ public sealed class JsonSettingsService : ISettingsService
         settings.OverlayScale = Math.Clamp(settings.OverlayScale, 0.75, 2.0);
         if (!Enum.IsDefined(settings.OverlayPosition))
             settings.OverlayPosition = OverlayPosition.TopCenter;
+        settings.OverlayDurationMs = AppSettings.NormalizeOverlayDuration(settings.OverlayDurationMs);
         return settings;
     }
 }

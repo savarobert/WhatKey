@@ -133,7 +133,7 @@ public sealed class OverlayService : IOverlayService
 
             _logger.LogDebug("Overlay topmost state reasserted; IsVisible={IsVisible}", _window.IsVisible);
 
-            await Task.Delay(TimeSpan.FromMilliseconds(1300), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(_settings.OverlayDurationMs), cancellationToken);
             if (!cancellationToken.IsCancellationRequested && !_disposed)
             {
                 _window.Hide();

@@ -31,6 +31,7 @@ public sealed class SettingsAndPositioningTests
                 Enabled = false,
                 OverlayPosition = OverlayPosition.BottomRight,
                 OverlayScale = 1.5,
+                OverlayDurationMs = 2200,
             });
 
             var loaded = service.Load();
@@ -38,6 +39,7 @@ public sealed class SettingsAndPositioningTests
             Assert.False(loaded.Enabled);
             Assert.Equal(OverlayPosition.BottomRight, loaded.OverlayPosition);
             Assert.Equal(1.5, loaded.OverlayScale);
+            Assert.Equal(2200, loaded.OverlayDurationMs);
         }
         finally
         {
@@ -67,11 +69,66 @@ public sealed class SettingsAndPositioningTests
     public void MissingSettingsUseDefaults()
     {
         var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
-        var loaded = new JsonSettingsService(path).Load();
+        try
+        {
+            var loaded = new JsonSettingsService(path).Load();
 
-        Assert.True(loaded.Enabled);
-        Assert.Equal(OverlayPosition.TopCenter, loaded.OverlayPosition);
-        Assert.Equal(1.0, loaded.OverlayScale);
+            Assert.True(loaded.Enabled);
+            Assert.Equal(OverlayPosition.TopCenter, loaded.OverlayPosition);
+            Assert.Equal(1.0, loaded.OverlayScale);
+            Assert.Equal(AppSettings.DefaultOverlayDurationMs, loaded.OverlayDurationMs);
+            Assert.True(File.Exists(path));
+            Assert.Contains("\"OverlayDurationMs\": 1300", File.ReadAllText(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void OlderSettingsUseDefaultDurationAndPreserveOtherValues()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, "{\"Enabled\":false,\"OverlayPosition\":\"BottomRight\",\"OverlayScale\":1.5}");
+
+            var loaded = new JsonSettingsService(path).Load();
+
+            Assert.False(loaded.Enabled);
+            Assert.Equal(OverlayPosition.BottomRight, loaded.OverlayPosition);
+            Assert.Equal(1.5, loaded.OverlayScale);
+            Assert.Equal(AppSettings.DefaultOverlayDurationMs, loaded.OverlayDurationMs);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(5001)]
+    public void InvalidDurationFallsBackToDefault(int durationMs)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"whatkey-{Guid.NewGuid():N}.json");
+        try
+        {
+            File.WriteAllText(path, $"{{\"OverlayDurationMs\":{durationMs}}}");
+
+            var loaded = new JsonSettingsService(path).Load();
+
+            Assert.Equal(AppSettings.DefaultOverlayDurationMs, loaded.OverlayDurationMs);
+        }
+        finally
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     [Fact]

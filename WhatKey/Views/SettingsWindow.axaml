@@ -5,14 +5,14 @@
         x:DataType="vm:SettingsViewModel"
         Title="WhatKey Settings"
         Width="420"
-        Height="250"
+        Height="300"
         MinWidth="380"
-        MinHeight="220"
+        MinHeight="270"
         WindowStartupLocation="CenterScreen">
     <StackPanel Margin="24" Spacing="18">
         <TextBlock FontSize="22" FontWeight="SemiBold" Text="WhatKey Settings" />
 
-        <Grid ColumnDefinitions="*,220" RowDefinitions="Auto,Auto" RowSpacing="14">
+        <Grid ColumnDefinitions="*,220" RowDefinitions="Auto,Auto,Auto" RowSpacing="14">
             <TextBlock Grid.Row="0" VerticalAlignment="Center" Text="Overlay position" />
             <ComboBox Grid.Row="0" Grid.Column="1"
                       ItemsSource="{Binding Positions}"
@@ -24,6 +24,17 @@
                 <Slider Width="170" Minimum="0.75" Maximum="2" SmallChange="0.05" LargeChange="0.25"
                         Value="{Binding Scale, Mode=TwoWay}" />
                 <TextBlock Width="42" VerticalAlignment="Center" Text="{Binding ScaleText}" />
+            </StackPanel>
+
+            <TextBlock Grid.Row="2" VerticalAlignment="Center" Text="Display duration" />
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <Slider Width="170"
+                        Minimum="100"
+                        Maximum="5000"
+                        SmallChange="100"
+                        LargeChange="500"
+                        Value="{Binding DurationMs, Mode=TwoWay}" />
+                <TextBlock Width="42" VerticalAlignment="Center" Text="{Binding DurationText}" />
             </StackPanel>
         </Grid>
 

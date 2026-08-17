@@ -19,6 +19,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     private readonly AppSettings _settings;
     private OverlayPositionOption _selectedPosition;
     private double _scale;
+    private double _durationMs;
     private readonly Subject<Unit> _settingsChanges = new();
     private bool _isDisposed;
 
@@ -28,6 +29,7 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
         _settings = settings;
         _selectedPosition = Positions.First(p => p.Value == settings.OverlayPosition);
         _scale = settings.OverlayScale;
+        _durationMs = settings.OverlayDurationMs;
         CloseCommand = ReactiveCommand.Create(() => { });
     }
 
@@ -69,6 +71,28 @@ public sealed class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     public string ScaleText => $"{Scale:P0}";
+
+    public double DurationMs
+    {
+        get => _durationMs;
+        set
+        {
+            var normalized = Math.Clamp(
+                Math.Round(value / 100.0, MidpointRounding.AwayFromZero) * 100,
+                AppSettings.MinOverlayDurationMs,
+                AppSettings.MaxOverlayDurationMs);
+            if (Math.Abs(_durationMs - normalized) > double.Epsilon)
+            {
+                this.RaiseAndSetIfChanged(ref _durationMs, normalized);
+                _settings.OverlayDurationMs = (int)normalized;
+                this.RaisePropertyChanged(nameof(DurationText));
+                Save();
+            }
+        }
+    }
+
+    public string DurationText => $"{DurationMs / 1000.0:0.0} s";
+
     public ReactiveCommand<RxVoid, RxVoid> CloseCommand { get; }
 
     public void Save()
