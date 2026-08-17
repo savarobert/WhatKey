@@ -40,6 +40,7 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
 
         try
         {
+            var permissionDeniedCount = 0;
             foreach (var path in Directory.EnumerateFiles("/dev/input", "event*"))
             {
                 FileStream? stream = null;
@@ -69,12 +70,19 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
                 catch (UnauthorizedAccessException)
                 {
                     stream?.Dispose();
-                    _logger.LogWarning("Permission denied reading Linux input device {DevicePath}; add the user to the input group for global monitoring", path);
+                    permissionDeniedCount++;
+                    _logger.LogDebug("Permission denied reading Linux input device {DevicePath}", path);
                 }
                 catch (IOException)
                 {
                     stream?.Dispose();
                 }
+            }
+
+            if (permissionDeniedCount > 0)
+            {
+                _logger.LogWarning("No usable evdev keyboard could be opened; access was denied for {DeniedDeviceCount} Linux input devices", permissionDeniedCount);
+                return false;
             }
         }
         catch (DirectoryNotFoundException)
@@ -83,7 +91,8 @@ internal class LinuxEvdevLockKeyBackend : ILockKeyBackend
         }
         catch (UnauthorizedAccessException)
         {
-            _logger.LogWarning("Permission denied enumerating /dev/input; Linux global monitoring is disabled");
+            _logger.LogWarning("Permission denied enumerating /dev/input; evdev monitoring is unavailable");
+            return false;
         }
 
         _logger.LogWarning("No Linux input device exposing Caps Lock, Num Lock, or Scroll Lock was found");

@@ -22,10 +22,14 @@ sealed class Program
         TaskScheduler.UnobservedTaskException += (_, eventArgs) =>
             logger.LogError(eventArgs.Exception, "Unobserved task exception");
 
+        var platformName = OperatingSystem.IsWindows() ? "Windows" :
+                           OperatingSystem.IsLinux() ? "Linux" :
+                           Environment.OSVersion.Platform.ToString();
+
         logger.LogInformation(
             "Application starting. Version: {Version}; Platform: {Platform}; LogDirectory: {LogDirectory}",
             typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown",
-            Environment.OSVersion.Platform,
+            platformName,
             logging.LogDirectory);
 
         try
