@@ -350,6 +350,7 @@ jobs:
       # Future macOS codesigning and notarization belong between publish and packaging.
       - name: Package macOS application
         env:
+          RID: ${{ matrix.rid }}
           RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
         run: |
           set -euo pipefail
