@@ -324,6 +324,7 @@ jobs:
 
       - name: Publish unsigned macOS application bundle
         env:
+          RID: ${{ matrix.rid }}
           RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
         run: |
           set -euo pipefail
