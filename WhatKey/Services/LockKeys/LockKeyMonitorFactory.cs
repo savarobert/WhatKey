@@ -21,6 +21,12 @@ public static class LockKeyMonitorFactory
             return new LinuxLockKeyMonitor(loggerFactory);
         }
 
+        if (OperatingSystem.IsMacOS())
+        {
+            logger.LogInformation("Selected lock-key backend {Backend}", nameof(MacOSLockKeyMonitor));
+            return new MacOSLockKeyMonitor(loggerFactory?.CreateLogger<MacOSLockKeyMonitor>());
+        }
+
         logger.LogWarning("Global lock-key monitoring is unavailable on this operating system");
         return new UnsupportedLockKeyMonitor();
     }

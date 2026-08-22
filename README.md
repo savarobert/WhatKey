@@ -4,11 +4,13 @@ WhatKey is a tray-only Avalonia utility that shows the resulting state of Caps L
 
 ## Build and publish
 
-The project targets .NET 10 and supports both Windows and Linux:
+The project targets .NET 10 and supports Windows x64, Linux x64, macOS Apple Silicon, and macOS Intel:
 
 ```bash
 dotnet publish WhatKey/WhatKey.csproj -c Release -r win-x64
 dotnet publish WhatKey/WhatKey.csproj -c Release -r linux-x64
+dotnet publish WhatKey/WhatKey.csproj -c Release -r osx-arm64
+dotnet publish WhatKey/WhatKey.csproj -c Release -r osx-x64
 ```
 
 ## Linux
@@ -118,6 +120,12 @@ pkill WhatKey
 #### Logs
 
 Linux diagnostics are stored in `logs/` next to the application executable. Include the relevant log files when reporting a problem.
+
+## macOS
+
+WhatKey runs as a menu-bar/tray-only application without a main window. macOS may require permission under **System Settings > Privacy & Security > Accessibility** for global Caps Lock monitoring. WhatKey continues running without crashing if that permission is unavailable.
+
+The current macOS release artifacts are unsigned. macOS may therefore show a Gatekeeper warning when the application is opened; signing and notarization are not included yet.
 
 ## Logging
 

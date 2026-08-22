@@ -6,7 +6,7 @@
 		<Nullable>enable</Nullable>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<RuntimeIdentifiers>win-x64;linux-x64</RuntimeIdentifiers>
+		<RuntimeIdentifiers>win-x64;linux-x64;osx-arm64;osx-x64</RuntimeIdentifiers>
 		<PublishAot>true</PublishAot>
 		<TrimMode>full</TrimMode>
 		<OptimizationPreference>Size</OptimizationPreference>

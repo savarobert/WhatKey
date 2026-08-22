@@ -15,6 +15,8 @@ public sealed class SettingsAndPositioningTests
             Assert.IsType<WindowsLockKeyMonitor>(monitor);
         else if (OperatingSystem.IsLinux())
             Assert.IsType<LinuxLockKeyMonitor>(monitor);
+        else if (OperatingSystem.IsMacOS())
+            Assert.IsType<MacOSLockKeyMonitor>(monitor);
         else
             Assert.IsType<UnsupportedLockKeyMonitor>(monitor);
     }

@@ -63,6 +63,7 @@ jobs:
         os:
           - windows-latest
           - ubuntu-latest
+          - macos-latest
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -106,6 +107,10 @@ jobs:
             rid: win-x64
           - os: ubuntu-latest
             rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-latest
+            rid: osx-x64
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -282,6 +287,82 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  publish-macos:
+    name: Publish macOS ${{ matrix.rid }}
+    if: >-
+      (github.ref_type == 'tag' && startsWith(github.ref_name, 'v')) ||
+      github.event_name == 'workflow_dispatch'
+    needs:
+      - validate-aot
+      - resolve-version
+    strategy:
+      fail-fast: false
+      matrix:
+        rid:
+          - osx-arm64
+          - osx-x64
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_SDK }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v5
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('global.json', 'WhatKey/**/*.csproj', 'WhatKey.Tests/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore "$SOLUTION"
+
+      - name: Publish unsigned macOS application bundle
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          bundle_root="$GITHUB_WORKSPACE/artifacts/$RID/WhatKey.app"
+          publish_dir="$bundle_root/Contents/MacOS"
+          mkdir -p "$publish_dir"
+          version_properties=()
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            version_properties+=(
+              "/p:Version=$RELEASE_VERSION"
+              "/p:AssemblyVersion=$RELEASE_VERSION.0"
+              "/p:FileVersion=$RELEASE_VERSION.0"
+              "/p:InformationalVersion=$RELEASE_VERSION"
+              "/p:IncludeSourceRevisionInInformationalVersion=false"
+            )
+          fi
+          dotnet publish "$APP_PROJECT" --configuration Release --runtime "$RID" "${version_properties[@]}" --no-restore --output "$publish_dir"
+          test -f "$publish_dir/$APP_NAME"
+          find "$publish_dir" -type f \( -name '*.pdb' -o -name '*.dbg' \) -delete
+          chmod +x "$publish_dir/$APP_NAME"
+          sed "s/__VERSION__/$RELEASE_VERSION/g" packaging/macos/Info.plist.template > "$bundle_root/Contents/Info.plist"
+
+      # Future macOS codesigning and notarization belong between publish and packaging.
+      - name: Package macOS application
+        env:
+          RELEASE_VERSION: ${{ needs.resolve-version.outputs.release_version }}
+        run: |
+          set -euo pipefail
+          archive="$GITHUB_WORKSPACE/artifacts/$APP_NAME-$RELEASE_TAG-$RID.tar.gz"
+          tar -C "$GITHUB_WORKSPACE/artifacts/$RID" -czf "$archive" WhatKey.app
+
+      - name: Upload macOS package
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.APP_NAME }}-${{ env.RELEASE_TAG }}-${{ matrix.rid }}
+          path: artifacts/${{ env.APP_NAME }}-${{ env.RELEASE_TAG }}-${{ matrix.rid }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
   release:
     name: Create GitHub Release
     if: >-
@@ -290,6 +371,7 @@ jobs:
     needs:
       - publish-windows
       - publish-linux
+      - publish-macos
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -305,6 +387,8 @@ jobs:
         run: |
           test -f "release-assets/$APP_NAME-$RELEASE_TAG-win-x64.zip"
           test -f "release-assets/$APP_NAME-$RELEASE_TAG-linux-x64.tar.gz"
+          test -f "release-assets/$APP_NAME-$RELEASE_TAG-osx-arm64.tar.gz"
+          test -f "release-assets/$APP_NAME-$RELEASE_TAG-osx-x64.tar.gz"
 
       - name: Create or reuse GitHub Release
         env:
@@ -365,11 +449,11 @@ jobs:
 
           release_missing=false
           if check_release; then
-            retry gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG"
+            retry gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --notes "Added OSX support."
           else
             check_status=$?
             if [ "$release_missing" = true ]; then
-              retry gh release create "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --generate-notes
+              retry gh release create "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --notes "Added OSX support."
             else
               echo "Unable to determine whether GitHub release $RELEASE_TAG exists after retries."
               exit "$check_status"
@@ -407,4 +491,6 @@ jobs:
             --repo "$GH_REPO" \
             "release-assets/$APP_NAME-$RELEASE_TAG-win-x64.zip" \
             "release-assets/$APP_NAME-$RELEASE_TAG-linux-x64.tar.gz" \
+            "release-assets/$APP_NAME-$RELEASE_TAG-osx-arm64.tar.gz" \
+            "release-assets/$APP_NAME-$RELEASE_TAG-osx-x64.tar.gz" \
             --clobber
