@@ -93,7 +93,7 @@ internal static class LinuxLockKeyBackendFactory
     public static IEnumerable<ILockKeyBackend> CreateCandidates(ILogger logger)
     {
         var sessionType = Environment.GetEnvironmentVariable("XDG_SESSION_TYPE")?.Trim().ToLowerInvariant();
-        logger.LogInformation("Detected Linux session type {SessionType}", sessionType ?? "unknown");
+        logger.LogInformation("Detected Linux session type {SessionType}", NormalizeSessionTypeForLog(sessionType));
         var isWayland = sessionType == "wayland" ||
                         (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY")) && sessionType != "x11");
         var isX11 = sessionType == "x11" ||
@@ -121,4 +121,12 @@ internal static class LinuxLockKeyBackendFactory
         logger.LogDebug("Probing Linux evdev lock-key backend for an unknown session");
         yield return new LinuxEvdevLockKeyBackend(logger);
     }
+
+    internal static string NormalizeSessionTypeForLog(string? sessionType)
+        => sessionType?.Trim().ToLowerInvariant() switch
+        {
+            "wayland" => "wayland",
+            "x11" => "x11",
+            _ => "unknown",
+        };
 }

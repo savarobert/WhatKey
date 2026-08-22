@@ -32,7 +32,7 @@ public sealed class JsonSettingsService : ISettingsService
                 File.ReadAllText(_filePath),
                 AppSettingsJsonContext.Default.AppSettings);
             var normalized = Normalize(settings ?? new AppSettings());
-            _logger?.LogInformation("Settings loaded from {SettingsPath}", _filePath);
+            _logger?.LogInformation("Settings loaded from {SettingsPath}", SanitizeForLog(_filePath));
             return normalized;
         }
         catch (JsonException exception)
@@ -42,12 +42,12 @@ public sealed class JsonSettingsService : ISettingsService
         }
         catch (IOException exception)
         {
-            _logger?.LogError(exception, "Failed to load settings from {SettingsPath}; using defaults", _filePath);
+            _logger?.LogError(exception, "Failed to load settings from {SettingsPath}; using defaults", SanitizeForLog(_filePath));
             return new AppSettings();
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger?.LogError(exception, "Access to settings file {SettingsPath} was denied; using defaults", _filePath);
+            _logger?.LogError(exception, "Access to settings file {SettingsPath} was denied; using defaults", SanitizeForLog(_filePath));
             return new AppSettings();
         }
     }
@@ -66,15 +66,19 @@ public sealed class JsonSettingsService : ISettingsService
             File.WriteAllText(
                 _filePath,
                 JsonSerializer.Serialize(Normalize(settings), AppSettingsJsonContext.Default.AppSettings));
-            _logger?.LogDebug("Settings saved to {SettingsPath}", _filePath);
+            _logger?.LogDebug("Settings saved to {SettingsPath}", SanitizeForLog(_filePath));
             return true;
         }
         catch (Exception exception)
         {
-            _logger?.LogError(exception, "Failed to save settings to {SettingsPath}", _filePath);
+            _logger?.LogError(exception, "Failed to save settings to {SettingsPath}", SanitizeForLog(_filePath));
             return false;
         }
     }
+
+    internal static string SanitizeForLog(string value)
+        => value.Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
 
     private static AppSettings Normalize(AppSettings settings)
     {
